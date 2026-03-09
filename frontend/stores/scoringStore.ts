@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import type { ThrowData, RoundResult } from '~/types/game'
+import { usePlayerStore } from './playerStore'
 
 export const useScoringStore = defineStore('scoring', {
     state: () => ({
@@ -16,7 +17,10 @@ export const useScoringStore = defineStore('scoring', {
 
         // Navigation state
         currentRoundView: 1,
-        isViewingPastRound: false
+        isViewingPastRound: false,
+
+        // Honors tracking (which team scored last)
+        teamWithHonors: null as 1 | 2 | null
     }),
 
     getters: {
@@ -93,8 +97,12 @@ export const useScoringStore = defineStore('scoring', {
 
             if (team1 > team2) {
                 team1Points = team1 - team2
+                this.teamWithHonors = 1
             } else if (team2 > team1) {
                 team2Points = team2 - team1
+                this.teamWithHonors = 2
+            } else {
+                // No score this round, honors stays with whoever had it
             }
 
             // If editing a past round, update history and recalculate scores
@@ -109,17 +117,43 @@ export const useScoringStore = defineStore('scoring', {
                 this.goToCurrentRound()
             } else {
                 // Normal scoring for current round
+
+                // Add points and check for bust (over 21)
+                const newTeam1Score = this.team1Score + team1Points
+                const newTeam2Score = this.team2Score + team2Points
+
+                const team1Busted = newTeam1Score > 21
+                const team2Busted = newTeam2Score > 21
+
                 this.roundHistory.push({
                     round: this.round,
                     throws: [...this.throws],
                     team1Points,
-                    team2Points
+                    team2Points,
+                    team1Busted,
+                    team2Busted
                 })
 
-                this.team1Score += team1Points
-                this.team2Score += team2Points
+                // Handle Team 1 bust
+                if (team1Busted) {
+                    this.team1Score = 15
+                } else {
+                    this.team1Score = newTeam1Score
+                }
+
+                // Handle Team 2 bust
+                if (team2Busted) {
+                    this.team2Score = 15
+                } else {
+                    this.team2Score = newTeam2Score
+                }
+
                 this.round++
                 this.currentRoundView = this.round
+
+                // Advance to next players' turn (2v2: switch to other players on each team)
+                const playerStore = usePlayerStore()
+                playerStore.advanceTurn()
             }
 
             this.resetRound()
@@ -130,8 +164,31 @@ export const useScoringStore = defineStore('scoring', {
             this.team2Score = 0
 
             for (const roundResult of this.roundHistory) {
-                this.team1Score += roundResult.team1Points
-                this.team2Score += roundResult.team2Points
+                // Add points and check for bust
+                const newTeam1Score = this.team1Score + roundResult.team1Points
+                const newTeam2Score = this.team2Score + roundResult.team2Points
+
+                // Handle Team 1 bust
+                if (newTeam1Score > 21) {
+                    this.team1Score = 15
+                } else {
+                    this.team1Score = newTeam1Score
+                }
+
+                // Handle Team 2 bust
+                if (newTeam2Score > 21) {
+                    this.team2Score = 15
+                } else {
+                    this.team2Score = newTeam2Score
+                }
+            }
+
+            // Recalculate honors from last completed round
+            const lastRound = this.roundHistory[this.roundHistory.length - 1]
+            if (lastRound?.team1Points && lastRound.team1Points > 0) {
+                this.teamWithHonors = 1
+            } else if (lastRound?.team2Points && lastRound.team2Points > 0) {
+                this.teamWithHonors = 2
             }
         },
 

@@ -7,6 +7,26 @@ export interface Game {
     createdAt: string
 }
 
+export interface Player {
+    id: string
+    name: string
+    team: 1 | 2
+}
+
+export interface PlayerStats {
+    playerId: string
+    holes: number
+    boards: number
+    misses: number
+    itos: number
+    totalThrows: number
+    pointsContributed: number
+    accuracy: number // percentage of bags that scored (holes + boards)
+    pointsPerRound: number // average points contributed per round
+    differentialPerRound: number // average differential impact per round
+    busts: number // number of times player caused their team to bust
+}
+
 export interface ThrowData {
     id: string
     round: number
@@ -24,4 +44,8 @@ export interface RoundResult {
     throws: ThrowData[]
     team1Points: number
     team2Points: number
+    team1Busted?: boolean
+    team2Busted?: boolean
 }
+
+export type GameFormat = '1v1' | '2v2'

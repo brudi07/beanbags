@@ -2,9 +2,11 @@
 import { ref, onMounted, onUnmounted } from "vue"
 import { v4 as uuidv4 } from "uuid"
 import { useScoringStore } from "~/stores/scoringStore"
+import { usePlayerStore } from "~/stores/playerStore"
 import type { ThrowData } from "~/types/game"
 
 const scoringStore = useScoringStore()
+const playerStore = usePlayerStore()
 
 const boardRef = ref<HTMLElement | null>(null)
 const missZoneRef = ref<HTMLElement | null>(null)
@@ -35,13 +37,15 @@ function detectResult(x: number, y: number) {
 }
 
 function startNewBag(team: 1 | 2, event: PointerEvent) {
-
     const id = uuidv4()
+
+    // Get the current player for this team
+    const currentPlayer = team === 1 ? playerStore.currentTeam1Player : playerStore.currentTeam2Player
 
     const newBag: ThrowData & { rotation?: number } = {
         id,
         team,
-        playerId: "player",
+        playerId: currentPlayer?.id || `team${team}-player1`,
         x: 0.5,
         y: 1.1,
         result: "miss",
@@ -204,17 +208,17 @@ onUnmounted(() => {
 
         <!-- BAG POOLS -->
 
-        <div class="flex justify-between w-full max-w-md">
+        <div class="flex justify-center items-start gap-12 w-full max-w-md">
 
             <!-- TEAM 1 -->
 
             <div class="flex flex-col items-center gap-2">
                 <p class="font-semibold text-sm">Team 1</p>
 
-                <div class="flex gap-3 mr-1">
+                <div class="flex gap-3 min-w-[208px] justify-center">
 
                     <div v-for="n in scoringStore.team1BagsRemaining" :key="'t1-' + n"
-                        class="w-12 h-12 bg-red-500 rounded-md cursor-pointer shadow"
+                        class="w-12 h-12 bg-red-500 rounded-md shadow cursor-pointer transition-transform hover:scale-105"
                         @pointerdown="startNewBag(1, $event)" />
 
                 </div>
@@ -225,10 +229,10 @@ onUnmounted(() => {
             <div class="flex flex-col items-center gap-2">
                 <p class="font-semibold text-sm">Team 2</p>
 
-                <div class="flex gap-3 ml-1">
+                <div class="flex gap-3 min-w-[208px] justify-center">
 
                     <div v-for="n in scoringStore.team2BagsRemaining" :key="'t2-' + n"
-                        class="w-12 h-12 bg-blue-500 rounded-md cursor-pointer shadow"
+                        class="w-12 h-12 bg-blue-500 rounded-md shadow cursor-pointer transition-transform hover:scale-105"
                         @pointerdown="startNewBag(2, $event)" />
 
                 </div>

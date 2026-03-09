@@ -22,8 +22,15 @@ const scoringStore = useScoringStore()
 
             <!-- Team 1 Score -->
             <div class="text-center flex-1">
-                <p class="text-sm text-gray-500">Team 1</p>
-                <p class="text-3xl font-bold">
+                <div class="relative inline-block">
+                    <!-- Crown for honors -->
+                    <div v-if="scoringStore.teamWithHonors === 1"
+                        class="absolute -top-8 left-1/2 -translate-x-1/2 text-3xl">
+                        👑
+                    </div>
+                    <p class="text-sm text-red-500">Team 1</p>
+                </div>
+                <p class="text-6xl font-bold text-red-500">
                     {{ scoringStore.displayedTeam1Score }}
                 </p>
             </div>
@@ -31,7 +38,7 @@ const scoringStore = useScoringStore()
             <!-- Round Display -->
             <div class="text-center px-6">
                 <p class="text-sm text-gray-500">Round</p>
-                <p class="text-4xl font-bold"
+                <p class="text-5xl font-bold"
                     :class="scoringStore.isViewingPastRound ? 'text-orange-600' : 'text-gray-900'">
                     {{ scoringStore.currentRoundView }}
                 </p>
@@ -42,8 +49,15 @@ const scoringStore = useScoringStore()
 
             <!-- Team 2 Score -->
             <div class="text-center flex-1">
-                <p class="text-sm text-gray-500">Team 2</p>
-                <p class="text-3xl font-bold">
+                <div class="relative inline-block">
+                    <!-- Crown for honors -->
+                    <div v-if="scoringStore.teamWithHonors === 2"
+                        class="absolute -top-8 left-1/2 -translate-x-1/2 text-3xl">
+                        👑
+                    </div>
+                    <p class="text-sm text-blue-500">Team 2</p>
+                </div>
+                <p class="text-6xl font-bold text-blue-500">
                     {{ scoringStore.displayedTeam2Score }}
                 </p>
             </div>
