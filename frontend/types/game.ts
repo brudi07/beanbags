@@ -8,8 +8,20 @@ export interface Game {
 }
 
 export interface ThrowData {
+    id: string
+    round: number
     team: 1 | 2
-    player: string
-    bagNumber: 1 | 2 | 3 | 4
-    result: 'board' | 'hole' | 'miss'
+    playerId: string
+    x: number
+    y: number
+    result: 'hole' | 'board' | 'miss' | 'ito' // intentional throw off
+    rotation: number
+    timestamp: number
+}
+
+export interface RoundResult {
+    round: number
+    throws: ThrowData[]
+    team1Points: number
+    team2Points: number
 }

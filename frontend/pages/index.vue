@@ -1,5 +1,34 @@
+<script setup lang="ts">
+</script>
+
 <template>
-  <div class="min-h-screen flex flex-col items-center justify-center">
-    <h1 class="text-4xl font-bold">Bean Bags App</h1>
+  <div class="min-h-screen flex flex-col items-center justify-center gap-8">
+
+    <h1 class="text-5xl font-bold">
+      Cornhole Tracker
+    </h1>
+
+    <p class="text-lg text-gray-500">
+      Track scores, throws, and analytics for every game.
+    </p>
+
+    <div class="flex gap-4">
+
+      <NuxtLink
+        to="/games/new"
+        class="bg-blue-600 text-white px-6 py-3 rounded-lg"
+      >
+        Start New Game
+      </NuxtLink>
+
+      <NuxtLink
+        to="/stats"
+        class="border px-6 py-3 rounded-lg"
+      >
+        View Stats
+      </NuxtLink>
+
+    </div>
+
   </div>
 </template>
