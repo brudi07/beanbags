@@ -196,7 +196,7 @@ onUnmounted(() => {
 
             <div ref="missZoneRef"
                 class="h-20 border-2 border-dashed border-gray-400 rounded-lg flex items-center justify-center text-sm text-gray-500 bg-gray-100">
-                Missed Throw
+               Off The Board
             </div>
 
             <div ref="itoZoneRef"

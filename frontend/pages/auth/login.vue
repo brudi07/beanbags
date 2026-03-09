@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuth } from '~/composables/useAuth'
 
 const router = useRouter()
+const auth = useAuth()
 
 const username = ref('')
 const password = ref('')
@@ -19,7 +21,7 @@ async function handleLogin() {
     error.value = null
 
     try {
-        // TODO Replace with your actual API endpoint
+        // TODO Replace with actual API endpoint
         const response = await fetch('/api/auth/login', {
             method: 'POST',
             headers: {
@@ -38,8 +40,9 @@ async function handleLogin() {
 
         const data = await response.json()
 
-        // Store auth token
+        // Store auth token and user data
         localStorage.setItem('authToken', data.token)
+        auth.setUser(data.user)
 
         // Redirect to home or dashboard
         router.push('/')

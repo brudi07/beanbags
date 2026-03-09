@@ -1,18 +1,35 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import type { UserRole } from '~/types/user'
+import { useAuth } from '~/composables/useAuth'
 
 const router = useRouter()
+const auth = useAuth()
 
 const formData = ref({
     username: '',
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    roles: ['player'] as UserRole[] // Default to player
 })
 
 const isLoading = ref(false)
 const error = ref<string | null>(null)
+
+function toggleRole(role: UserRole) {
+    const index = formData.value.roles.indexOf(role)
+    if (index > -1) {
+        // Remove role if already selected (but keep at least one)
+        if (formData.value.roles.length > 1) {
+            formData.value.roles.splice(index, 1)
+        }
+    } else {
+        // Add role
+        formData.value.roles.push(role)
+    }
+}
 
 async function handleSignup() {
     // Validation
@@ -31,11 +48,16 @@ async function handleSignup() {
         return
     }
 
+    if (formData.value.roles.length === 0) {
+        error.value = 'Please select at least one role'
+        return
+    }
+
     isLoading.value = true
     error.value = null
 
     try {
-        // TODO Replace with your actual API endpoint
+        // TODO Replace with actual API endpoint
         const response = await fetch('/api/auth/signup', {
             method: 'POST',
             headers: {
@@ -45,6 +67,7 @@ async function handleSignup() {
                 username: formData.value.username,
                 email: formData.value.email,
                 password: formData.value.password,
+                roles: formData.value.roles
             })
         })
 
@@ -55,9 +78,9 @@ async function handleSignup() {
 
         const data = await response.json()
 
-        // Store auth token
+        // Store auth token and user data
         localStorage.setItem('authToken', data.token)
-        localStorage.setItem('username', formData.value.username)
+        auth.setUser(data.user)
 
         // Redirect to home
         router.push('/')
@@ -102,6 +125,40 @@ async function handleSignup() {
                         <input id="email" v-model="formData.email" type="email" autocomplete="email" required
                             class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             placeholder="Enter your email" />
+                    </div>
+
+                    <!-- Role Selection -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-3">
+                            I want to be a... (select all that apply)
+                        </label>
+                        <div class="space-y-2">
+                            <label class="flex items-center p-3 border-2 rounded-lg cursor-pointer transition-all"
+                                :class="formData.roles.includes('player')
+                                    ? 'border-blue-500 bg-blue-50'
+                                    : 'border-gray-300 hover:border-gray-400'">
+                                <input type="checkbox" :checked="formData.roles.includes('player')"
+                                    @change="toggleRole('player')"
+                                    class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500" />
+                                <div class="ml-3">
+                                    <span class="font-semibold text-gray-900">Player</span>
+                                    <p class="text-xs text-gray-600">Join leagues and play games</p>
+                                </div>
+                            </label>
+
+                            <label class="flex items-center p-3 border-2 rounded-lg cursor-pointer transition-all"
+                                :class="formData.roles.includes('organizer')
+                                    ? 'border-blue-500 bg-blue-50'
+                                    : 'border-gray-300 hover:border-gray-400'">
+                                <input type="checkbox" :checked="formData.roles.includes('organizer')"
+                                    @change="toggleRole('organizer')"
+                                    class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500" />
+                                <div class="ml-3">
+                                    <span class="font-semibold text-gray-900">League Organizer</span>
+                                    <p class="text-xs text-gray-600">Create and manage leagues</p>
+                                </div>
+                            </label>
+                        </div>
                     </div>
 
                     <!-- Password Field -->

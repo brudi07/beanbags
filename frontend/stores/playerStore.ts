@@ -152,11 +152,15 @@ export const usePlayerStore = defineStore('player', {
                         stats.itos++
                         break
                 }
+            })
 
-                // Calculate accuracy (holes + boards / total throws)
+            // Calculate accuracy AFTER processing all throws
+            // Exclude ITOs from accuracy calculation (strategic, not performance)
+            statsMap.forEach(stats => {
                 const scoringThrows = stats.holes + stats.boards
-                stats.accuracy = stats.totalThrows > 0
-                    ? Math.round((scoringThrows / stats.totalThrows) * 100)
+                const attemptsToScore = stats.totalThrows - stats.itos // Exclude ITOs
+                stats.accuracy = attemptsToScore > 0
+                    ? Math.round((scoringThrows / attemptsToScore) * 100)
                     : 0
             })
 

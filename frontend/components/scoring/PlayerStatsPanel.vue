@@ -111,7 +111,7 @@ const isCurrentTurn = (playerId: string) => {
                 </div>
 
                 <div class="bg-gray-50 rounded-lg p-2">
-                    <div class="text-gray-500 text-xs">Misses</div>
+                    <div class="text-gray-500 text-xs">Off</div>
                     <div class="font-bold text-gray-600">{{ stats.misses }}</div>
                 </div>
 

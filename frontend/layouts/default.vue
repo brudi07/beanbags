@@ -1,27 +1,17 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuth } from '~/composables/useAuth'
 
 const router = useRouter()
-const isLoggedIn = ref(false)
-const username = ref('')
+const auth = useAuth()
 
 onMounted(() => {
-  // Check if user is logged in
-  const authToken = localStorage.getItem('authToken')
-  const storedUsername = localStorage.getItem('username')
-
-  if (authToken) {
-    isLoggedIn.value = true
-    username.value = storedUsername || 'User'
-  }
+  auth.loadUserFromStorage()
 })
 
 function handleLogout() {
-  localStorage.removeItem('authToken')
-  localStorage.removeItem('username')
-  isLoggedIn.value = false
-  username.value = ''
+  auth.clearUser()
   router.push('/auth/login')
 }
 
@@ -33,29 +23,35 @@ function handleLogin() {
 <template>
   <div>
 
-    <nav class="flex items-center justify-between gap-6 p-4 border-b">
+    <nav class="flex items-center justify-between gap-6 p-4 border-b bg-white shadow-sm">
 
       <!-- Left side navigation -->
       <div class="flex gap-6">
-        <NuxtLink to="/" class="hover:text-blue-600 transition-colors">Home</NuxtLink>
-        <NuxtLink to="/leagues" class="hover:text-blue-600 transition-colors">Leagues</NuxtLink>
-        <NuxtLink to="/stats" class="hover:text-blue-600 transition-colors">Stats</NuxtLink>
+        <NuxtLink to="/" class="font-medium hover:text-blue-600 transition-colors">Home</NuxtLink>
+        <NuxtLink to="/leagues" class="font-medium hover:text-blue-600 transition-colors">Leagues</NuxtLink>
+        <NuxtLink to="/stats" class="font-medium hover:text-blue-600 transition-colors">Stats</NuxtLink>
+        <NuxtLink to="/history" class="font-medium hover:text-blue-600 transition-colors">History</NuxtLink>
       </div>
 
       <!-- Right side - Login/User menu -->
       <div class="flex items-center gap-4">
 
         <!-- Logged Out State -->
-        <button v-if="!isLoggedIn" @click="handleLogin"
+        <button v-if="!auth.isAuthenticated.value" @click="handleLogin"
           class="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">
           Login
         </button>
 
         <!-- Logged In State -->
         <div v-else class="flex items-center gap-3">
-          <span class="text-sm text-gray-700">
-            Welcome, <span class="font-semibold">{{ username }}</span>
-          </span>
+          <div class="text-right">
+            <p class="text-sm font-semibold text-gray-900">
+              {{ auth.currentUser.value?.username }}
+            </p>
+            <p class="text-xs text-gray-500">
+              {{ auth.currentUser.value?.roles.join(', ') }}
+            </p>
+          </div>
           <button @click="handleLogout"
             class="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-colors">
             Logout

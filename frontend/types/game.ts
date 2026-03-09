@@ -21,7 +21,7 @@ export interface PlayerStats {
     itos: number
     totalThrows: number
     pointsContributed: number
-    accuracy: number // percentage of bags that scored (holes + boards)
+    accuracy: number // percentage of scoring attempts (excludes ITOs)
     pointsPerRound: number // average points contributed per round
     differentialPerRound: number // average differential impact per round
     busts: number // number of times player caused their team to bust
