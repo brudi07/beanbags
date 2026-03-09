@@ -20,7 +20,11 @@ export const useScoringStore = defineStore('scoring', {
         isViewingPastRound: false,
 
         // Honors tracking (which team scored last)
-        teamWithHonors: null as 1 | 2 | null
+        teamWithHonors: null as 1 | 2 | null,
+
+        // Game completion
+        gameWinner: null as 1 | 2 | null,
+        gameCompleted: false
     }),
 
     getters: {
@@ -148,6 +152,15 @@ export const useScoringStore = defineStore('scoring', {
                     this.team2Score = newTeam2Score
                 }
 
+                // Check for winner (exactly 21 points)
+                if (this.team1Score === 21) {
+                    this.gameWinner = 1
+                    this.gameCompleted = true
+                } else if (this.team2Score === 21) {
+                    this.gameWinner = 2
+                    this.gameCompleted = true
+                }
+
                 this.round++
                 this.currentRoundView = this.round
 
@@ -224,6 +237,43 @@ export const useScoringStore = defineStore('scoring', {
             this.isViewingPastRound = false
             this.currentRoundView = this.round
             this.resetRound()
+        },
+
+        async submitGameResults(gameId: string) {
+            // This will submit the final game results to your backend
+            // Customize the payload structure based on your API needs
+
+            const gameData = {
+                gameId,
+                winner: this.gameWinner,
+                finalScore: {
+                    team1: this.team1Score,
+                    team2: this.team2Score
+                },
+                totalRounds: this.round - 1,
+                roundHistory: this.roundHistory,
+                completedAt: new Date().toISOString()
+            }
+
+            try {
+                // Replace this with your actual API endpoint
+                const response = await fetch(`/api/games/${gameId}/complete`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(gameData)
+                })
+
+                if (!response.ok) {
+                    throw new Error('Failed to submit game results')
+                }
+
+                return await response.json()
+            } catch (error) {
+                console.error('Error submitting game results:', error)
+                throw error
+            }
         }
 
     }
