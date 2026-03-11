@@ -20,19 +20,32 @@ export const useAuth = () => {
         localStorage.removeItem('user')
     }
 
+    function isTokenExpired(token: string): boolean {
+        try {
+            const payload = JSON.parse(atob(token.split('.')[1]))
+            return payload.exp * 1000 < Date.now()
+        } catch {
+            return true
+        }
+    }
+
     function loadUserFromStorage() {
         const authToken = localStorage.getItem('authToken')
         const userJson = localStorage.getItem('user')
 
-        if (authToken && userJson) {
-            try {
-                const user = JSON.parse(userJson) as User
-                currentUser.value = user
-                isAuthenticated.value = true
-            } catch (error) {
-                console.error('Failed to parse user from localStorage', error)
-                clearUser()
-            }
+        if (!authToken || !userJson) return
+
+        if (isTokenExpired(authToken)) {
+            clearUser()
+            return
+        }
+
+        try {
+            const user = JSON.parse(userJson) as User
+            currentUser.value = user
+            isAuthenticated.value = true
+        } catch {
+            clearUser()
         }
     }
 
