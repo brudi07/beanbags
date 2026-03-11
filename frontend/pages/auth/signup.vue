@@ -10,7 +10,8 @@ const auth = useAuth()
 const api = useApi()
 
 const formData = ref({
-    username: '',
+    firstName: '',
+    lastName: '',
     email: '',
     password: '',
     confirmPassword: '',
@@ -35,7 +36,7 @@ function toggleRole(role: UserRole) {
 
 async function handleSignup() {
     // Validation
-    if (!formData.value.username || !formData.value.email || !formData.value.password || !formData.value.confirmPassword) {
+    if (!formData.value.firstName || !formData.value.lastName || !formData.value.email || !formData.value.password || !formData.value.confirmPassword) {
         error.value = 'Please fill in all fields'
         return
     }
@@ -62,7 +63,8 @@ async function handleSignup() {
         const data = await api.fetch<AuthResponse>('/auth/signup', {
             method: 'POST',
             body: {
-                username: formData.value.username,
+                first_name: formData.value.firstName,
+                last_name: formData.value.lastName,
                 email: formData.value.email,
                 password: formData.value.password,
                 roles: formData.value.roles
@@ -99,14 +101,26 @@ async function handleSignup() {
 
                 <form @submit.prevent="handleSignup" class="space-y-5">
 
-                    <!-- Username Field -->
-                    <div>
-                        <label for="username" class="block text-sm font-medium text-gray-700 mb-2">
-                            Username
-                        </label>
-                        <input id="username" v-model="formData.username" type="text" autocomplete="username" required
-                            class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            placeholder="Choose a username" />
+                    <!-- Name Fields -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label for="firstName" class="block text-sm font-medium text-gray-700 mb-2">
+                                First Name
+                            </label>
+                            <input id="firstName" v-model="formData.firstName" type="text" autocomplete="given-name"
+                                required
+                                class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                placeholder="First name" />
+                        </div>
+                        <div>
+                            <label for="lastName" class="block text-sm font-medium text-gray-700 mb-2">
+                                Last Name
+                            </label>
+                            <input id="lastName" v-model="formData.lastName" type="text" autocomplete="family-name"
+                                required
+                                class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                placeholder="Last name" />
+                        </div>
                     </div>
 
                     <!-- Email Field -->

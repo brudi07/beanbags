@@ -64,18 +64,15 @@ function nextDate() {
 function goToToday() {
     if (availableDates.value.length === 0) return
 
-    const today = new Date().toISOString().slice(0, 10)
-
+    const today: string = new Date().toISOString().split('T')[0]!
     const todayIndex = availableDates.value.findIndex(date => date === today)
 
     if (todayIndex !== -1) {
         selectedDateIndex.value = todayIndex
     } else {
+        // Find closest future date
         const futureIndex = availableDates.value.findIndex(date => date > today)
-        selectedDateIndex.value =
-            futureIndex !== -1
-                ? futureIndex
-                : Math.max(0, availableDates.value.length - 1)
+        selectedDateIndex.value = futureIndex !== -1 ? futureIndex : Math.max(0, availableDates.value.length - 1)
     }
 }
 
@@ -121,8 +118,24 @@ async function startGame(game: LeagueGame) {
         // Continue in-progress game
         router.push(`/games/${game.game_id}`)
     } else {
-        // Create new game
-        router.push(`/games/new?leagueGameId=${game.id}`)
+        // Create new game - pass player names so games/new.vue can pre-fill
+        const team1Names = game.team1_player_ids.map(id =>
+            members.value.find(m => m.player_id === id)?.player_name || ''
+        )
+        const team2Names = game.team2_player_ids.map(id =>
+            members.value.find(m => m.player_id === id)?.player_name || ''
+        )
+        const params = new URLSearchParams({
+            leagueId,
+            leagueGameId: String(game.id),
+            format: league.value!.format,
+            bestOf: String(league.value!.games_per_match),
+            t1p1: team1Names[0] || '',
+            t2p1: team2Names[0] || '',
+        })
+        if (team1Names[1]) params.set('t1p2', team1Names[1])
+        if (team2Names[1]) params.set('t2p2', team2Names[1])
+        router.push(`/games/new?${params.toString()}`)
     }
 }
 
@@ -146,7 +159,7 @@ async function confirmReschedule() {
         // ✅ No Response cast, no .ok check, no .json()
         await api.fetch(`/leagues/${leagueId}/games/${rescheduleGameId.value}/reschedule`, {
             method: 'PATCH',
-            body: { scheduled_date: newScheduledDate.value }
+            body: { scheduledDate: newScheduledDate.value }
         })
 
         closeReschedule()
@@ -186,20 +199,6 @@ async function leaveLeague() {
 
 function editLeague() {
     router.push(`/leagues/${leagueId}/edit`)
-}
-
-async function generateSchedule() {
-    if (!confirm('Generate the league schedule now? This will create all matches.')) return
-
-    try {
-        await api.fetch(`/leagues/${leagueId}/generate-schedule`, {
-            method: 'POST'
-        })
-
-        await fetchLeagueData()
-    } catch (err: any) {
-        alert(err.data?.error || err.message)
-    }
 }
 
 function getPlayerNames(playerIds: number[]): string {
@@ -288,11 +287,6 @@ onMounted(() => {
                                 Edit League
                             </button>
 
-                            <button v-if="schedule.length === 0" @click="generateSchedule"
-                                class="px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700">
-                                Generate Schedule
-                            </button>
-
                             <!-- Allow organizer to join as player if not already a member -->
                             <button v-if="!isMember && league.current_teams < league.max_teams" @click="joinLeague"
                                 class="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700">
@@ -316,8 +310,13 @@ onMounted(() => {
                         <template v-else>
                             <button v-if="league.current_teams < league.max_teams" @click="joinLeague"
                                 class="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700">
-                                Join League
+                                {{ league.format === '2v2' ? 'Join as Team' : 'Join League' }}
                             </button>
+                            <NuxtLink v-if="league.format === '2v2' && league.current_teams < league.max_teams"
+                                to="/teams"
+                                class="text-xs text-center text-blue-600 hover:underline mt-1">
+                                Manage your team
+                            </NuxtLink>
                         </template>
                     </div>
                 </div>
@@ -372,7 +371,7 @@ onMounted(() => {
                                 <!-- Current Date Display -->
                                 <div class="text-center">
                                     <p class="text-2xl font-bold text-gray-900">
-                                        {{ selectedDate ? new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', {
+                                        {{ selectedDate ? new Date(selectedDate).toLocaleDateString('en-US', {
                                             weekday: 'long',
                                             month: 'long',
                                             day: 'numeric',
@@ -446,10 +445,14 @@ onMounted(() => {
                                     <!-- Actions -->
                                     <div class="flex items-center gap-2 ml-4">
 
+                                        <!-- Organizer: Reschedule -->
+                                        <button v-if="isOrganizer && game.status === 'scheduled'"
+                                            @click="openReschedule(game.id, game.scheduled_date)"
+                                            class="px-3 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
+                                            Reschedule
+                                        </button>
+
                                         <!-- Player: Start/View Game -->
-                                         <div class="text-xs text-gray-400">
-                                            canStartGame: {{ canStartGame(game) }}
-                                        </div>
                                         <button v-if="canStartGame(game)" @click="startGame(game)"
                                             class="px-4 py-2 rounded-lg font-semibold text-white transition-colors"
                                             :class="{
@@ -457,19 +460,9 @@ onMounted(() => {
                                                 'bg-yellow-600 hover:bg-yellow-700': game.status === 'in_progress',
                                                 'bg-blue-600 hover:bg-blue-700': game.status === 'completed'
                                             }">
-                                            {{ game.status === 'completed'
-                                                ? 'View Game'
-                                                : game.status === 'in_progress'
-                                            ? 'Continue'
-                                            : 'Start Game'
-                                            }}
-                                        </button>
-
-                                        <!-- Organizer: Reschedule -->
-                                        <button v-if="isOrganizer && game.status === 'scheduled'"
-                                            @click="openReschedule(game.id, game.scheduled_date)"
-                                            class="px-3 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
-                                            Reschedule
+                                            {{ game.status === 'completed' ? 'View Game' : game.status === 'in_progress'
+                                                ?
+                                                'Continue' : 'Start Game' }}
                                         </button>
 
                                         <!-- Non-player: View only if completed -->
@@ -501,18 +494,17 @@ onMounted(() => {
                                         <th class="px-4 py-3 text-center text-sm font-semibold text-gray-700">Losses
                                         </th>
                                         <th class="px-4 py-3 text-center text-sm font-semibold text-gray-700">Win %</th>
-                                        <th class="px-4 py-3 text-center text-sm font-semibold text-gray-700">Points
-                                        </th>
+                                        <th class="px-4 py-3 text-center text-sm font-semibold text-gray-700">+/-</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-200">
-                                    <tr v-for="(team, index) in standings" :key="team.id" class="hover:bg-gray-50">
+                                    <tr v-for="(team, index) in standings" :key="team.team_id" class="hover:bg-gray-50">
                                         <td class="px-4 py-3 text-sm font-bold">{{ index + 1 }}</td>
-                                        <td class="px-4 py-3 text-sm font-semibold">{{ team.name }}</td>
+                                        <td class="px-4 py-3 text-sm font-semibold">{{ team.team_name }}</td>
                                         <td class="px-4 py-3 text-sm text-center">{{ team.wins }}</td>
                                         <td class="px-4 py-3 text-sm text-center">{{ team.losses }}</td>
-                                        <td class="px-4 py-3 text-sm text-center">{{ team.winPercentage }}%</td>
-                                        <td class="px-4 py-3 text-sm text-center font-bold">{{ team.points }}</td>
+                                        <td class="px-4 py-3 text-sm text-center">{{ team.win_percentage }}%</td>
+                                        <td class="px-4 py-3 text-sm text-center font-bold">{{ team.point_diff }}</td>
                                     </tr>
                                 </tbody>
                             </table>

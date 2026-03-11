@@ -1,10 +1,10 @@
 export interface Game {
     id: string
-    leagueId?: string
+    league_id?: string
     team1: number
     team2: number
     status: "pending" | "active" | "completed" | "abandoned"
-    createdAt: string
+    created_at: string
 }
 
 export interface Player {

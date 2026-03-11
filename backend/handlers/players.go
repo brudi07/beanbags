@@ -74,6 +74,49 @@ func GetPlayers(db *sql.DB) gin.HandlerFunc {
 	}
 }
 
+// GetMyPlayer returns the current user's player profile with team info
+// GET /api/players/me
+func GetMyPlayer(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, exists := GetCurrentUserID(c)
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			return
+		}
+
+		type MyPlayer struct {
+			ID       int     `json:"id"`
+			UserID   int     `json:"user_id"`
+			Name     string  `json:"name"`
+			TeamID   *int    `json:"team_id"`
+			TeamName *string `json:"team_name"`
+		}
+
+		var player MyPlayer
+		var teamName sql.NullString
+		err := db.QueryRow(`
+			SELECT p.id, p.user_id, p.name, p.team_id, t.name
+			FROM players p
+			LEFT JOIN teams t ON p.team_id = t.id
+			WHERE p.user_id = ?
+		`, userID).Scan(&player.ID, &player.UserID, &player.Name, &player.TeamID, &teamName)
+
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Player profile not found"})
+			return
+		} else if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch player"})
+			return
+		}
+
+		if teamName.Valid {
+			player.TeamName = &teamName.String
+		}
+
+		c.JSON(http.StatusOK, player)
+	}
+}
+
 // GetPlayer returns a specific player by ID
 // GET /api/players/:id
 func GetPlayer(db *sql.DB) gin.HandlerFunc {

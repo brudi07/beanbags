@@ -3,29 +3,31 @@ package handlers
 import (
 	"database/sql"
 	"net/http"
+	"strings"
 
 	"brudi07/beanbags/models"
 
 	"github.com/gin-gonic/gin"
 )
 
-// CreateMatch creates a new match/game
+// CreateMatch creates a new match/game from player names
 // POST /api/games
 func CreateMatch(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		_, exists := GetCurrentUserID(c)
+		userID, exists := GetCurrentUserID(c)
 		if !exists {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 			return
 		}
 
 		var req struct {
-			LeagueID     *int   `json:"league_id"`
-			TournamentID *int   `json:"tournament_id"`
-			Team1ID      int    `json:"team1_id" binding:"required"`
-			Team2ID      int    `json:"team2_id" binding:"required"`
-			Location     string `json:"location"`
-			Notes        string `json:"notes"`
+			Format  string `json:"format" binding:"required,oneof=1v1 2v2"`
+			BestOf  int    `json:"bestOf"`
+			Players struct {
+				Team1 []string `json:"team1" binding:"required"`
+				Team2 []string `json:"team2" binding:"required"`
+			} `json:"players" binding:"required"`
+			LeagueGameID *int `json:"leagueGameId"`
 		}
 
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -33,11 +35,40 @@ func CreateMatch(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		result, err := db.Exec(`
-			INSERT INTO matches (league_id, tournament_id, team1_id, team2_id, location, notes, status)
-			VALUES (?, ?, ?, ?, ?, ?, 'active')
-		`, req.LeagueID, req.TournamentID, req.Team1ID, req.Team2ID, req.Location, req.Notes)
+		// Get or create teams by name
+		team1Name := strings.Join(req.Players.Team1, " & ")
+		team2Name := strings.Join(req.Players.Team2, " & ")
 
+		db.Exec(`INSERT OR IGNORE INTO teams (name) VALUES (?)`, team1Name)
+		var team1ID int64
+		db.QueryRow(`SELECT id FROM teams WHERE name = ?`, team1Name).Scan(&team1ID)
+
+		db.Exec(`INSERT OR IGNORE INTO teams (name) VALUES (?)`, team2Name)
+		var team2ID int64
+		db.QueryRow(`SELECT id FROM teams WHERE name = ?`, team2Name).Scan(&team2ID)
+
+		// Create player records for this game session
+		for _, name := range req.Players.Team1 {
+			db.Exec(`INSERT INTO players (user_id, name, team_id) VALUES (?, ?, ?)`, userID, name, team1ID)
+		}
+		for _, name := range req.Players.Team2 {
+			db.Exec(`INSERT INTO players (user_id, name, team_id) VALUES (?, ?, ?)`, userID, name, team2ID)
+		}
+
+		// Look up league_id from league game if provided
+		var leagueID *int
+		if req.LeagueGameID != nil {
+			var lid int
+			if err := db.QueryRow(`SELECT league_id FROM league_games WHERE id = ?`, *req.LeagueGameID).Scan(&lid); err == nil {
+				leagueID = &lid
+			}
+		}
+
+		// Create the match
+		result, err := db.Exec(`
+			INSERT INTO matches (league_id, team1_id, team2_id, status)
+			VALUES (?, ?, ?, 'active')
+		`, leagueID, team1ID, team2ID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create match"})
 			return
@@ -45,10 +76,12 @@ func CreateMatch(db *sql.DB) gin.HandlerFunc {
 
 		matchID, _ := result.LastInsertId()
 
-		c.JSON(http.StatusCreated, gin.H{
-			"id":      matchID,
-			"message": "Match created successfully",
-		})
+		// Link match to league game and mark it in progress
+		if req.LeagueGameID != nil {
+			db.Exec(`UPDATE league_games SET game_id = ?, status = 'in_progress' WHERE id = ?`, matchID, *req.LeagueGameID)
+		}
+
+		c.JSON(http.StatusCreated, gin.H{"id": matchID})
 	}
 }
 

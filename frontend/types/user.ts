@@ -2,11 +2,12 @@ export type UserRole = 'player' | 'organizer'
 
 export interface User {
     id: number
-    username: string
     email: string
+    first_name: string
+    last_name: string
     roles: UserRole[]
-    createdAt?: string
-    updatedAt?: string
+    created_at?: string
+    updated_at?: string
 }
 
 export interface AuthResponse {

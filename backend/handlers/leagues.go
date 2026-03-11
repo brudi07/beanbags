@@ -54,7 +54,7 @@ func GetPublicLeagues(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		rows, err := db.Query(`
 			SELECT
-				l.id, l.name, l.description, l.organizer_id, u.username as organizer_name,
+				l.id, l.name, l.description, l.organizer_id, u.first_name || ' ' || u.last_name as organizer_name,
 				l.format, l.games_per_match, l.max_teams, l.current_teams,
 				l.start_date, l.weeks_of_play, l.location, l.is_public, l.status,
 				l.created_at, l.updated_at
@@ -108,7 +108,7 @@ func GetMyLeagues(db *sql.DB) gin.HandlerFunc {
 
 		rows, err := db.Query(`
 			SELECT DISTINCT
-				l.id, l.name, l.description, l.organizer_id, u.username as organizer_name,
+				l.id, l.name, l.description, l.organizer_id, u.first_name || ' ' || u.last_name as organizer_name,
 				l.format, l.games_per_match, l.max_teams, l.current_teams,
 				l.start_date, l.weeks_of_play, l.location, l.is_public, l.status,
 				l.created_at, l.updated_at
@@ -152,7 +152,7 @@ func GetLeagueByID(db *sql.DB) gin.HandlerFunc {
 		var league models.League
 		err := db.QueryRow(`
 			SELECT
-				l.id, l.name, l.description, l.organizer_id, u.username as organizer_name,
+				l.id, l.name, l.description, l.organizer_id, u.first_name || ' ' || u.last_name as organizer_name,
 				l.format, l.games_per_match, l.max_teams, l.current_teams,
 				l.start_date, l.weeks_of_play, l.location, l.is_public, l.status,
 				l.created_at, l.updated_at
@@ -179,7 +179,7 @@ func GetLeagueByID(db *sql.DB) gin.HandlerFunc {
 	}
 }
 
-// JoinLeague adds a player to a league
+// JoinLeague adds a player (or team) to a league
 func JoinLeague(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, exists := GetCurrentUserID(c)
@@ -190,18 +190,20 @@ func JoinLeague(db *sql.DB) gin.HandlerFunc {
 
 		leagueID := c.Param("id")
 
-		// Get player ID
+		// Get player and their team
 		var playerID int
-		err := db.QueryRow(`SELECT id FROM players WHERE user_id = ?`, userID).Scan(&playerID)
+		var teamID sql.NullInt64
+		err := db.QueryRow(`SELECT id, team_id FROM players WHERE user_id = ?`, userID).Scan(&playerID, &teamID)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Player profile not found"})
 			return
 		}
 
-		// Check if league is full
+		// Get league info
 		var currentTeams, maxTeams int
-		err = db.QueryRow(`SELECT current_teams, max_teams FROM leagues WHERE id = ?`, leagueID).
-			Scan(&currentTeams, &maxTeams)
+		var format string
+		err = db.QueryRow(`SELECT current_teams, max_teams, format FROM leagues WHERE id = ?`, leagueID).
+			Scan(&currentTeams, &maxTeams, &format)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "League not found"})
 			return
@@ -212,25 +214,56 @@ func JoinLeague(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		// Add member
-		_, err = db.Exec(`
-			INSERT INTO league_members (league_id, player_id)
-			VALUES (?, ?)
-		`, leagueID, playerID)
+		if format == "2v2" {
+			if !teamID.Valid {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "You need a team to join a 2v2 league. Go to Teams to create or join one."})
+				return
+			}
 
-		if err != nil {
-			c.JSON(http.StatusConflict, gin.H{"error": "Already a member or failed to join"})
-			return
+			// Get all players on the team
+			rows, err := db.Query(`SELECT id FROM players WHERE team_id = ?`, teamID.Int64)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get team members"})
+				return
+			}
+			defer rows.Close()
+
+			var teamPlayerIDs []int
+			for rows.Next() {
+				var pid int
+				if rows.Scan(&pid) == nil {
+					teamPlayerIDs = append(teamPlayerIDs, pid)
+				}
+			}
+
+			if len(teamPlayerIDs) < 2 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Your team needs 2 players to join a 2v2 league"})
+				return
+			}
+
+			// Add all team members to the league
+			for _, pid := range teamPlayerIDs {
+				_, err = db.Exec(`INSERT INTO league_members (league_id, player_id) VALUES (?, ?)`, leagueID, pid)
+				if err != nil {
+					c.JSON(http.StatusConflict, gin.H{"error": "Team is already in this league"})
+					return
+				}
+			}
+		} else {
+			// 1v1: add single player
+			_, err = db.Exec(`INSERT INTO league_members (league_id, player_id) VALUES (?, ?)`, leagueID, playerID)
+			if err != nil {
+				c.JSON(http.StatusConflict, gin.H{"error": "Already a member or failed to join"})
+				return
+			}
 		}
 
-		// Update current teams count
 		db.Exec(`UPDATE leagues SET current_teams = current_teams + 1 WHERE id = ?`, leagueID)
-
 		c.JSON(http.StatusOK, gin.H{"message": "Successfully joined league"})
 	}
 }
 
-// LeaveLeague removes a player from a league
+// LeaveLeague removes a player (or team) from a league
 func LeaveLeague(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, exists := GetCurrentUserID(c)
@@ -241,33 +274,51 @@ func LeaveLeague(db *sql.DB) gin.HandlerFunc {
 
 		leagueID := c.Param("id")
 
-		// Get player ID
+		// Get player and their team
 		var playerID int
-		err := db.QueryRow(`SELECT id FROM players WHERE user_id = ?`, userID).Scan(&playerID)
+		var teamID sql.NullInt64
+		err := db.QueryRow(`SELECT id, team_id FROM players WHERE user_id = ?`, userID).Scan(&playerID, &teamID)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Player profile not found"})
 			return
 		}
 
-		result, err := db.Exec(`
-			DELETE FROM league_members
-			WHERE league_id = ? AND player_id = ?
-		`, leagueID, playerID)
-
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to leave league"})
+		// Get league format
+		var format string
+		if err := db.QueryRow(`SELECT format FROM leagues WHERE id = ?`, leagueID).Scan(&format); err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "League not found"})
 			return
 		}
 
-		rowsAffected, _ := result.RowsAffected()
-		if rowsAffected == 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Not a member of this league"})
-			return
+		if format == "2v2" && teamID.Valid {
+			// Remove all team members from the league
+			rows, err := db.Query(`SELECT id FROM players WHERE team_id = ?`, teamID.Int64)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get team members"})
+				return
+			}
+			defer rows.Close()
+
+			for rows.Next() {
+				var pid int
+				if rows.Scan(&pid) == nil {
+					db.Exec(`DELETE FROM league_members WHERE league_id = ? AND player_id = ?`, leagueID, pid)
+				}
+			}
+		} else {
+			result, err := db.Exec(`DELETE FROM league_members WHERE league_id = ? AND player_id = ?`, leagueID, playerID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to leave league"})
+				return
+			}
+			rowsAffected, _ := result.RowsAffected()
+			if rowsAffected == 0 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Not a member of this league"})
+				return
+			}
 		}
 
-		// Update current teams count
 		db.Exec(`UPDATE leagues SET current_teams = current_teams - 1 WHERE id = ?`, leagueID)
-
 		c.JSON(http.StatusOK, gin.H{"message": "Successfully left league"})
 	}
 }

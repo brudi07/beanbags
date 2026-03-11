@@ -43,12 +43,12 @@ export interface LeagueGame {
     match_number: number
     game_number: number
     scheduled_date: string
-    team1: number
-    team2: number
-    team1_player_ids: number[]  // ✅ Changed to number[] (player IDs)
-    team2_player_ids: number[]  // ✅ Changed to number[] (player IDs)
+    team1: string  // ✅ Team name (e.g., "Ben & Sarah")
+    team2: string  // ✅ Team name (e.g., "Alex & Jordan")
+    team1_player_ids: number[]  // Player IDs for team 1
+    team2_player_ids: number[]  // Player IDs for team 2
     status: 'scheduled' | 'in_progress' | 'completed'
-    winning_team?: 1 | 2  // ✅ Which team won (1 or 2)
+    winning_team?: 1 | 2  // Which team won (1 or 2)
     game_id?: number
     created_at: string
     updated_at: string

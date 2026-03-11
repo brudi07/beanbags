@@ -8,23 +8,25 @@ import "time"
 
 type User struct {
 	ID           int       `json:"id"`
-	Username     string    `json:"username"`
 	Email        string    `json:"email"`
-	PasswordHash string    `json:"-"` // Never expose in JSON
+	PasswordHash string    `json:"-"`
+	FirstName    string    `json:"first_name"`
+	LastName     string    `json:"last_name"`
 	Roles        []string  `json:"roles"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 type RegisterRequest struct {
-	Username string   `json:"username" binding:"required"`
-	Email    string   `json:"email" binding:"required,email"`
-	Password string   `json:"password" binding:"required,min=6"`
-	Roles    []string `json:"roles" binding:"required"`
+	Email     string   `json:"email" binding:"required,email"`
+	Password  string   `json:"password" binding:"required,min=6"`
+	FirstName string   `json:"first_name" binding:"required"`
+	LastName  string   `json:"last_name" binding:"required"`
+	Roles     []string `json:"roles" binding:"required"`
 }
 
 type LoginRequest struct {
-	Username string `json:"username" binding:"required"`
+	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required"`
 }
 
@@ -101,8 +103,8 @@ type LeagueGame struct {
 	ScheduledDate  string    `json:"scheduled_date"`
 	Team1          string    `json:"team1"`
 	Team2          string    `json:"team2"`
-	Team1PlayerIDs []string  `json:"team1_player_ids"`
-	Team2PlayerIDs []string  `json:"team2_player_ids"`
+	Team1PlayerIDs []int     `json:"team1_player_ids"`
+	Team2PlayerIDs []int     `json:"team2_player_ids"`
 	Status         string    `json:"status"`
 	WinningTeam    *int      `json:"winning_team,omitempty"`
 	GameID         *int      `json:"game_id,omitempty"`

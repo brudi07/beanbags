@@ -47,9 +47,10 @@ func runSchema(db *sql.DB) error {
 
 	CREATE TABLE IF NOT EXISTS users (
 	    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-	    username        TEXT NOT NULL UNIQUE,
 	    email           TEXT NOT NULL UNIQUE,
 	    password_hash   TEXT NOT NULL,
+	    first_name      TEXT NOT NULL DEFAULT '',
+	    last_name       TEXT NOT NULL DEFAULT '',
 	    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
 	    updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
@@ -270,5 +271,6 @@ func runSchema(db *sql.DB) error {
 			return fmt.Errorf("error executing schema statement %q: %w", stmt, err)
 		}
 	}
-	return nil
+
+return nil
 }

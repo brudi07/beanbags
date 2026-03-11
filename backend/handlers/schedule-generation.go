@@ -96,10 +96,6 @@ func GenerateLeagueSchedule(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		// -------------------------------
-		// FIX 1: Parse date in LOCAL TZ
-		// -------------------------------
-
 		loc := time.Now().Location()
 
 		startTime, err := time.ParseInLocation(
@@ -155,10 +151,6 @@ func GenerateLeagueSchedule(db *sql.DB) gin.HandlerFunc {
 		}
 
 		matchNumber := 1
-
-		// -------------------------------
-		// FIX 2: Respect weeks_of_play
-		// -------------------------------
 
 		for week := 0; week < weeksOfPlay; week++ {
 

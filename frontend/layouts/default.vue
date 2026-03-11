@@ -29,6 +29,7 @@ function handleLogin() {
       <div class="flex gap-6">
         <NuxtLink to="/" class="font-medium hover:text-blue-600 transition-colors">Home</NuxtLink>
         <NuxtLink to="/leagues" class="font-medium hover:text-blue-600 transition-colors">Leagues</NuxtLink>
+        <NuxtLink to="/teams" class="font-medium hover:text-blue-600 transition-colors">Teams</NuxtLink>
         <NuxtLink to="/stats" class="font-medium hover:text-blue-600 transition-colors">Stats</NuxtLink>
         <NuxtLink to="/history" class="font-medium hover:text-blue-600 transition-colors">History</NuxtLink>
       </div>
@@ -46,7 +47,7 @@ function handleLogin() {
         <div v-else class="flex items-center gap-3">
           <div class="text-right">
             <p class="text-sm font-semibold text-gray-900">
-              {{ auth.currentUser.value?.username }}
+              {{ auth.currentUser.value?.first_name }} {{ auth.currentUser.value?.last_name }}
             </p>
             <p class="text-xs text-gray-500">
               {{ auth.currentUser.value?.roles.join(', ') }}

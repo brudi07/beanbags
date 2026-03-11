@@ -83,8 +83,13 @@ func main() {
 		// Teams & Players
 		authorized.POST("/teams", handlers.CreateTeam(db))
 		authorized.GET("/teams", handlers.GetTeams(db))
+		authorized.GET("/teams/:id", handlers.GetTeam(db))
+		authorized.GET("/teams/:id/members", handlers.GetTeamMembers(db))
+		authorized.POST("/teams/:id/join", handlers.JoinTeam(db))
+		authorized.POST("/teams/leave", handlers.LeaveTeam(db))
 		authorized.POST("/players", handlers.CreatePlayer(db))
 		authorized.GET("/players", handlers.GetPlayers(db))
+		authorized.GET("/players/me", handlers.GetMyPlayer(db))
 		authorized.GET("/players/:id", handlers.GetPlayer(db))
 		authorized.GET("/players/:id/stats", handlers.GetPlayerStats(db))
 		authorized.GET("/players/:id/heatmap", handlers.GetPlayerHeatmap(db))

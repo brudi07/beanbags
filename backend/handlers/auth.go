@@ -45,12 +45,12 @@ func Register(db *sql.DB) gin.HandlerFunc {
 
 		// Create user
 		result, err := tx.Exec(`
-			INSERT INTO users (username, email, password_hash)
-			VALUES (?, ?, ?)
-		`, req.Username, req.Email, string(hashedPassword))
+			INSERT INTO users (email, password_hash, first_name, last_name)
+			VALUES (?, ?, ?, ?)
+		`, req.Email, string(hashedPassword), req.FirstName, req.LastName)
 
 		if err != nil {
-			c.JSON(http.StatusConflict, gin.H{"error": "Username or email already exists"})
+			c.JSON(http.StatusConflict, gin.H{"error": "An account with this email already exists"})
 			return
 		}
 
@@ -78,10 +78,11 @@ func Register(db *sql.DB) gin.HandlerFunc {
 		}
 
 		if hasPlayerRole {
+			playerName := req.FirstName + " " + req.LastName
 			_, err = tx.Exec(`
 				INSERT INTO players (user_id, name)
 				VALUES (?, ?)
-			`, userID, req.Username)
+			`, userID, playerName)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create player profile"})
 				return
@@ -102,10 +103,11 @@ func Register(db *sql.DB) gin.HandlerFunc {
 
 		// Return user data
 		user := models.User{
-			ID:       int(userID),
-			Username: req.Username,
-			Email:    req.Email,
-			Roles:    req.Roles,
+			ID:        int(userID),
+			Email:     req.Email,
+			FirstName: req.FirstName,
+			LastName:  req.LastName,
+			Roles:     req.Roles,
 		}
 
 		c.JSON(http.StatusCreated, models.AuthResponse{
@@ -129,14 +131,15 @@ func Login(db *sql.DB) gin.HandlerFunc {
 		var passwordHash string
 
 		err := db.QueryRow(`
-			SELECT id, username, email, password_hash, created_at, updated_at
+			SELECT id, email, password_hash, first_name, last_name, created_at, updated_at
 			FROM users
-			WHERE username = ?
-		`, req.Username).Scan(
+			WHERE email = ?
+		`, req.Email).Scan(
 			&user.ID,
-			&user.Username,
 			&user.Email,
 			&passwordHash,
+			&user.FirstName,
+			&user.LastName,
 			&user.CreatedAt,
 			&user.UpdatedAt,
 		)
