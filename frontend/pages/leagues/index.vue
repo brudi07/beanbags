@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useApi } from '~/composables/useApi';
 import { useAuth } from '~/composables/useAuth'
 import type { League } from '~/types/league'
 
 const router = useRouter()
 const auth = useAuth()
+const api = useApi()
 
 const publicLeagues = ref<League[]>([])
 const myLeagues = ref<League[]>([])
@@ -16,16 +18,15 @@ const error = ref<string | null>(null)
 // Browse filters
 const searchQuery = ref('')
 const formatFilter = ref<'all' | '1v1' | '2v2'>('all')
-const statusFilter = ref<'all' | 'upcoming' | 'active'>('active') // Default to active
+const statusFilter = ref<'all' | 'upcoming' | 'active'>('all')
 
 // Filter public leagues (exclude ones user is already in)
 const availableLeagues = computed(() => {
     const myLeagueIds = new Set(myLeagues.value.map(l => l.id))
 
     return publicLeagues.value
-        .filter(league => !myLeagueIds.has(league.id)) // Exclude leagues user is in
+        .filter(league => !myLeagueIds.has(league.id))
         .filter(league => {
-            // Search filter
             if (searchQuery.value) {
                 const query = searchQuery.value.toLowerCase()
                 const matchesSearch =
@@ -35,12 +36,10 @@ const availableLeagues = computed(() => {
                 if (!matchesSearch) return false
             }
 
-            // Format filter
             if (formatFilter.value !== 'all' && league.format !== formatFilter.value) {
                 return false
             }
 
-            // Status filter
             if (statusFilter.value !== 'all' && league.status !== statusFilter.value) {
                 return false
             }
@@ -51,11 +50,11 @@ const availableLeagues = computed(() => {
 
 // Separate my leagues
 const organizingLeagues = computed(() =>
-    myLeagues.value.filter(league => league.organizerId === auth.currentUser.value?.id)
+    myLeagues.value.filter(league => league.organizer_id === auth.currentUser.value?.id)
 )
 
 const playingLeagues = computed(() =>
-    myLeagues.value.filter(league => league.organizerId !== auth.currentUser.value?.id)
+    myLeagues.value.filter(league => league.organizer_id !== auth.currentUser.value?.id)
 )
 
 // Quick stats
@@ -75,16 +74,9 @@ async function fetchPublicLeagues() {
     isLoadingPublic.value = true
 
     try {
-        const response = await fetch('/api/leagues/public', {
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-            }
-        })
-
-        if (!response.ok) throw new Error('Failed to fetch public leagues')
-        publicLeagues.value = await response.json()
+        publicLeagues.value = await api.fetch<League[]>('/leagues/public')
     } catch (err: any) {
-        error.value = err.message
+        error.value = err.data?.error || err.message
     } finally {
         isLoadingPublic.value = false
     }
@@ -94,64 +86,42 @@ async function fetchMyLeagues() {
     isLoadingMy.value = true
 
     try {
-        const response = await fetch('/api/leagues/my-leagues', {
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-            }
-        })
-
-        if (!response.ok) throw new Error('Failed to fetch your leagues')
-        myLeagues.value = await response.json()
+        myLeagues.value = await api.fetch<League[]>('/leagues/my-leagues')
     } catch (err: any) {
-        error.value = err.message
+        error.value = err.data?.error || err.message
     } finally {
         isLoadingMy.value = false
     }
 }
 
-async function joinLeague(leagueId: string) {
+async function joinLeague(leagueId: number) {
     try {
-        const response = await fetch(`/api/leagues/${leagueId}/join`, {
+        await api.fetch(`/leagues/${leagueId}/join`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-            }
         })
 
-        if (!response.ok) throw new Error('Failed to join league')
-
-        // Refresh both lists
         await Promise.all([fetchPublicLeagues(), fetchMyLeagues()])
-
-        // Redirect to league page
         router.push(`/leagues/${leagueId}`)
     } catch (err: any) {
-        alert(err.message || 'Failed to join league')
+        alert(err.data?.error || err.message || 'Failed to join league')
     }
 }
 
-async function leaveLeague(leagueId: string) {
+async function leaveLeague(leagueId: number) {
     if (!confirm('Are you sure you want to leave this league?')) return
 
     try {
-        const response = await fetch(`/api/leagues/${leagueId}/leave`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-            }
+        await api.fetch(`/leagues/${leagueId}/leave`, {
+            method: 'POST'
         })
 
-        if (!response.ok) throw new Error('Failed to leave league')
-
-        // Refresh both lists
         await Promise.all([fetchPublicLeagues(), fetchMyLeagues()])
     } catch (err: any) {
-        alert(err.message || 'Failed to leave league')
+        alert(err.data?.error || err.message || 'Failed to leave league')
     }
 }
 
-function viewLeague(leagueId: string) {
+function viewLeague(leagueId: number) {
     router.push(`/leagues/${leagueId}`)
 }
 
@@ -168,10 +138,8 @@ onMounted(() => {
 <template>
     <div class="max-w-6xl mx-auto py-8 px-4">
 
-        <!-- ========== BROWSE & JOIN SECTION ========== -->
+        <!-- BROWSE & JOIN SECTION -->
         <div class="mb-12">
-
-            <!-- Header -->
             <div class="mb-6">
                 <h1 class="text-3xl font-bold text-gray-900 mb-2">Browse & Join Leagues</h1>
                 <p class="text-gray-600">Find and join cornhole leagues in your area</p>
@@ -180,21 +148,13 @@ onMounted(() => {
             <!-- Filters -->
             <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-
-                    <!-- Search -->
                     <div class="md:col-span-1">
-                        <label for="search" class="block text-sm font-medium text-gray-700 mb-2">
-                            Search
-                        </label>
+                        <label for="search" class="block text-sm font-medium text-gray-700 mb-2">Search</label>
                         <input id="search" v-model="searchQuery" type="text" placeholder="League name, location..."
                             class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" />
                     </div>
-
-                    <!-- Format Filter -->
                     <div>
-                        <label for="format" class="block text-sm font-medium text-gray-700 mb-2">
-                            Format
-                        </label>
+                        <label for="format" class="block text-sm font-medium text-gray-700 mb-2">Format</label>
                         <select id="format" v-model="formatFilter"
                             class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
                             <option value="all">All Formats</option>
@@ -202,12 +162,8 @@ onMounted(() => {
                             <option value="2v2">2v2 Only</option>
                         </select>
                     </div>
-
-                    <!-- Status Filter -->
                     <div>
-                        <label for="status" class="block text-sm font-medium text-gray-700 mb-2">
-                            Status
-                        </label>
+                        <label for="status" class="block text-sm font-medium text-gray-700 mb-2">Status</label>
                         <select id="status" v-model="statusFilter"
                             class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
                             <option value="all">All</option>
@@ -215,7 +171,6 @@ onMounted(() => {
                             <option value="active">Active</option>
                         </select>
                     </div>
-
                 </div>
             </div>
 
@@ -228,9 +183,8 @@ onMounted(() => {
             <div v-else-if="availableLeagues.length === 0" class="text-center py-12 bg-gray-50 rounded-xl">
                 <p class="text-gray-500 text-lg mb-2">No available leagues found</p>
                 <p class="text-gray-400 text-sm">
-                    {{ searchQuery || formatFilter !== 'all' || statusFilter !== 'all'
-                        ? 'Try adjusting your filters'
-                        : 'Check back later for new leagues' }}
+                    {{ searchQuery || formatFilter !== 'all' || statusFilter !== 'all' ? 'Try adjusting your filters' :
+                        'Check back later for new leagues' }}
                 </p>
             </div>
 
@@ -238,8 +192,6 @@ onMounted(() => {
             <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div v-for="league in availableLeagues" :key="league.id"
                     class="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow overflow-hidden">
-
-                    <!-- Header -->
                     <div class="px-6 pt-6 pb-4 border-b border-gray-100">
                         <div class="flex items-start justify-between mb-3">
                             <h3 class="text-xl font-bold text-gray-900 flex-1">{{ league.name }}</h3>
@@ -253,7 +205,6 @@ onMounted(() => {
                         <p class="text-sm text-gray-600 line-clamp-2">{{ league.description }}</p>
                     </div>
 
-                    <!-- Info -->
                     <div class="px-6 py-4 space-y-2 text-sm">
                         <div class="flex items-center text-gray-600">
                             <span class="font-medium w-24">Format:</span>
@@ -261,7 +212,7 @@ onMounted(() => {
                         </div>
                         <div class="flex items-center text-gray-600">
                             <span class="font-medium w-24">Teams:</span>
-                            <span>{{ league.currentTeams }}/{{ league.maxTeams }}</span>
+                            <span>{{ league.current_teams }}/{{ league.max_teams }}</span>
                         </div>
                         <div class="flex items-center text-gray-600">
                             <span class="font-medium w-24">Location:</span>
@@ -269,31 +220,26 @@ onMounted(() => {
                         </div>
                         <div class="flex items-center text-gray-600">
                             <span class="font-medium w-24">Starts:</span>
-                            <span>{{ new Date(league.startDate).toLocaleDateString() }}</span>
+                            <span>{{ new Date(league.start_date).toLocaleDateString() }}</span>
                         </div>
                     </div>
 
-                    <!-- Actions -->
                     <div class="px-6 pb-6 flex gap-2">
                         <button @click="viewLeague(league.id)"
                             class="flex-1 py-2 px-4 rounded-lg font-semibold text-gray-700 border-2 border-gray-300 hover:bg-gray-50 transition-colors">
                             View
                         </button>
-                        <button v-if="league.currentTeams < league.maxTeams" @click="joinLeague(league.id)"
+                        <button v-if="league.current_teams < league.max_teams" @click="joinLeague(league.id)"
                             class="flex-1 py-2 px-4 rounded-lg font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors">
                             Join
                         </button>
                     </div>
-
                 </div>
             </div>
-
         </div>
 
-        <!-- ========== MY LEAGUES SECTION ========== -->
+        <!-- MY LEAGUES SECTION -->
         <div class="border-t-4 border-gray-200 pt-12">
-
-            <!-- Header -->
             <div class="flex items-center justify-between mb-6">
                 <div>
                     <h2 class="text-3xl font-bold text-gray-900 mb-2">My Leagues</h2>
@@ -350,8 +296,50 @@ onMounted(() => {
                         <span class="text-sm font-normal text-gray-500">({{ organizingLeagues.length }})</span>
                     </h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <LeagueCard v-for="league in organizingLeagues" :key="league.id" :league="league"
-                            :is-organizer="true" @view="viewLeague" />
+                        <!-- League Card for Organizing -->
+                        <div v-for="league in organizingLeagues" :key="league.id"
+                            class="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow overflow-hidden">
+                            <div class="px-6 pt-6 pb-4 border-b border-gray-100">
+                                <div class="flex items-start justify-between mb-3">
+                                    <h4 class="text-xl font-bold text-gray-900 flex-1">{{ league.name }}</h4>
+                                    <span class="px-3 py-1 rounded-full text-xs font-semibold ml-2" :class="{
+                                        'bg-green-100 text-green-700': league.status === 'active',
+                                        'bg-blue-100 text-blue-700': league.status === 'upcoming',
+                                        'bg-gray-100 text-gray-700': league.status === 'completed'
+                                    }">
+                                        {{ league.status }}
+                                    </span>
+                                </div>
+                                <p class="text-sm text-gray-600 line-clamp-2">{{ league.description }}</p>
+                            </div>
+
+                            <div class="px-6 py-4 space-y-2 text-sm">
+                                <div class="flex items-center text-gray-600">
+                                    <span class="font-medium w-24">Format:</span>
+                                    <span>{{ league.format }}</span>
+                                </div>
+                                <div class="flex items-center text-gray-600">
+                                    <span class="font-medium w-24">Teams:</span>
+                                    <span>{{ league.current_teams }}/{{ league.max_teams }}</span>
+                                </div>
+                                <div class="flex items-center text-gray-600">
+                                    <span class="font-medium w-24">Location:</span>
+                                    <span class="truncate">{{ league.location }}</span>
+                                </div>
+                                <div class="flex items-center">
+                                    <span class="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-semibold rounded">
+                                        Organizer
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="px-6 pb-6">
+                                <button @click="viewLeague(league.id)"
+                                    class="w-full py-2 px-4 rounded-lg font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors">
+                                    Manage
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -362,87 +350,54 @@ onMounted(() => {
                         <span class="text-sm font-normal text-gray-500">({{ playingLeagues.length }})</span>
                     </h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <LeagueCard v-for="league in playingLeagues" :key="league.id" :league="league"
-                            :is-organizer="false" @view="viewLeague" @leave="leaveLeague" />
+                        <!-- League Card for Playing -->
+                        <div v-for="league in playingLeagues" :key="league.id"
+                            class="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow overflow-hidden">
+                            <div class="px-6 pt-6 pb-4 border-b border-gray-100">
+                                <div class="flex items-start justify-between mb-3">
+                                    <h4 class="text-xl font-bold text-gray-900 flex-1">{{ league.name }}</h4>
+                                    <span class="px-3 py-1 rounded-full text-xs font-semibold ml-2" :class="{
+                                        'bg-green-100 text-green-700': league.status === 'active',
+                                        'bg-blue-100 text-blue-700': league.status === 'upcoming',
+                                        'bg-gray-100 text-gray-700': league.status === 'completed'
+                                    }">
+                                        {{ league.status }}
+                                    </span>
+                                </div>
+                                <p class="text-sm text-gray-600 line-clamp-2">{{ league.description }}</p>
+                            </div>
+
+                            <div class="px-6 py-4 space-y-2 text-sm">
+                                <div class="flex items-center text-gray-600">
+                                    <span class="font-medium w-24">Format:</span>
+                                    <span>{{ league.format }}</span>
+                                </div>
+                                <div class="flex items-center text-gray-600">
+                                    <span class="font-medium w-24">Teams:</span>
+                                    <span>{{ league.current_teams }}/{{ league.max_teams }}</span>
+                                </div>
+                                <div class="flex items-center text-gray-600">
+                                    <span class="font-medium w-24">Location:</span>
+                                    <span class="truncate">{{ league.location }}</span>
+                                </div>
+                            </div>
+
+                            <div class="px-6 pb-6 flex gap-2">
+                                <button @click="viewLeague(league.id)"
+                                    class="flex-1 py-2 px-4 rounded-lg font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors">
+                                    View
+                                </button>
+                                <button @click="leaveLeague(league.id)"
+                                    class="py-2 px-4 rounded-lg font-semibold text-red-600 border-2 border-red-600 hover:bg-red-50 transition-colors">
+                                    Leave
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
             </div>
-
         </div>
 
     </div>
 </template>
-
-<!-- League Card Component -->
-<script lang="ts">
-export default {
-    components: {
-        LeagueCard: {
-            props: {
-                league: Object,
-                isOrganizer: Boolean
-            },
-            emits: ['view', 'leave'],
-            template: `
-        <div class="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow overflow-hidden">
-
-          <div class="px-6 pt-6 pb-4 border-b border-gray-100">
-            <div class="flex items-start justify-between mb-3">
-              <h4 class="text-xl font-bold text-gray-900 flex-1">{{ league.name }}</h4>
-              <span
-                class="px-3 py-1 rounded-full text-xs font-semibold ml-2"
-                :class="{
-                  'bg-green-100 text-green-700': league.status === 'active',
-                  'bg-blue-100 text-blue-700': league.status === 'upcoming',
-                  'bg-gray-100 text-gray-700': league.status === 'completed'
-                }"
-              >
-                {{ league.status }}
-              </span>
-            </div>
-            <p class="text-sm text-gray-600 line-clamp-2">{{ league.description }}</p>
-          </div>
-
-          <div class="px-6 py-4 space-y-2 text-sm">
-            <div class="flex items-center text-gray-600">
-              <span class="font-medium w-24">Format:</span>
-              <span>{{ league.format }}</span>
-            </div>
-            <div class="flex items-center text-gray-600">
-              <span class="font-medium w-24">Teams:</span>
-              <span>{{ league.currentTeams }}/{{ league.maxTeams }}</span>
-            </div>
-            <div class="flex items-center text-gray-600">
-              <span class="font-medium w-24">Location:</span>
-              <span class="truncate">{{ league.location }}</span>
-            </div>
-            <div v-if="isOrganizer" class="flex items-center">
-              <span class="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-semibold rounded">
-                Organizer
-              </span>
-            </div>
-          </div>
-
-          <div class="px-6 pb-6 flex gap-2">
-            <button
-              @click="$emit('view', league.id)"
-              class="flex-1 py-2 px-4 rounded-lg font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors"
-            >
-              {{ isOrganizer ? 'Manage' : 'View' }}
-            </button>
-            <button
-              v-if="!isOrganizer"
-              @click="$emit('leave', league.id)"
-              class="py-2 px-4 rounded-lg font-semibold text-red-600 border-2 border-red-600 hover:bg-red-50 transition-colors"
-            >
-              Leave
-            </button>
-          </div>
-
-        </div>
-      `
-        }
-    }
-}
-</script>

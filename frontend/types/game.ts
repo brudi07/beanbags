@@ -1,8 +1,8 @@
 export interface Game {
     id: string
     leagueId?: string
-    team1: string
-    team2: string
+    team1: number
+    team2: number
     status: "pending" | "active" | "completed" | "abandoned"
     createdAt: string
 }

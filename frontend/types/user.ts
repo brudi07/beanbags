@@ -1,12 +1,12 @@
 export type UserRole = 'player' | 'organizer'
 
 export interface User {
-    id: string
+    id: number
     username: string
     email: string
     roles: UserRole[]
-    createdAt: string
-    updatedAt: string
+    createdAt?: string
+    updatedAt?: string
 }
 
 export interface AuthResponse {
@@ -24,13 +24,13 @@ export const Permissions = {
     // Organizer permissions
     canCreateLeague: (user: User) => user.roles.includes('organizer'),
     canEditLeague: (user: User, leagueOwnerId: string) => {
-        return user.roles.includes('organizer') && user.id === leagueOwnerId
+        return user.roles.includes('organizer') && user.id === Number(leagueOwnerId)
     },
     canEditGameResults: (user: User, leagueOwnerId: string) => {
-        return user.roles.includes('organizer') && user.id === leagueOwnerId
+        return user.roles.includes('organizer') && user.id === Number(leagueOwnerId)
     },
     canManageLeagueMembers: (user: User, leagueOwnerId: string) => {
-        return user.roles.includes('organizer') && user.id === leagueOwnerId
+        return user.roles.includes('organizer') && user.id === Number(leagueOwnerId)
     },
 
     // Combined checks

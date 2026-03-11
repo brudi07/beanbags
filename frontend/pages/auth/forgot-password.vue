@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useApi } from '~/composables/useApi'
 
 const email = ref('')
 const isLoading = ref(false)
 const success = ref(false)
 const error = ref<string | null>(null)
+const api = useApi()
 
 async function handleResetPassword() {
     if (!email.value) {
@@ -18,15 +20,12 @@ async function handleResetPassword() {
 
     try {
         // TODO Replace with your actual API endpoint
-        const response = await fetch('/api/auth/forgot-password', {
+        const response = await api.fetch('/auth/forgot-password', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
+            body: {
                 email: email.value,
-            })
-        })
+            }
+        }) as Response
 
         if (!response.ok) {
             throw new Error('Failed to send reset email')

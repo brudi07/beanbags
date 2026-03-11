@@ -1,26 +1,27 @@
 export interface League {
-    id: string
+    id: number
     name: string
     description: string
-    organizerId: string
-    organizerName: string
+    organizer_id: number
+    organizer_name: string
     status: 'active' | 'completed' | 'upcoming'
     format: '1v1' | '2v2'
-    maxTeams: number
-    currentTeams: number
-    startDate: string
-    endDate?: string
+    games_per_match: 1 | 3 | 5
+    max_teams: number
+    current_teams: number
+    start_date: string
+    weeks_of_play: number
     location: string
-    isPublic: boolean
-    createdAt: string
-    updatedAt: string
+    is_public: boolean
+    created_at: string
+    updated_at: string
 }
 
 export interface LeaguePlayer {
-    leagueId: string
-    playerId: string
-    playerName: string
-    joinedAt: string
+    league_id: number
+    player_id: number
+    player_name: string
+    joined_at: string
     role: 'player' | 'organizer'
 }
 
@@ -28,9 +29,32 @@ export interface CreateLeagueData {
     name: string
     description: string
     format: '1v1' | '2v2'
-    maxTeams: number
-    startDate: string
-    endDate?: string
+    games_per_match: 1 | 3 | 5
+    max_teams: number
+    start_date: string
+    weeks_of_play: number
     location: string
-    isPublic: boolean
+    is_public: boolean
+}
+
+export interface LeagueGame {
+    id: number
+    league_id: number
+    match_number: number
+    game_number: number
+    scheduled_date: string
+    team1: number
+    team2: number
+    team1_player_ids: number[]  // ✅ Changed to number[] (player IDs)
+    team2_player_ids: number[]  // ✅ Changed to number[] (player IDs)
+    status: 'scheduled' | 'in_progress' | 'completed'
+    winning_team?: 1 | 2  // ✅ Which team won (1 or 2)
+    game_id?: number
+    created_at: string
+    updated_at: string
+}
+
+export interface LeagueSchedule {
+    date: string
+    games: LeagueGame[]
 }

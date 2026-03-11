@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import type { UserRole } from '~/types/user'
+import type { AuthResponse, UserRole } from '~/types/user'
 import { useAuth } from '~/composables/useAuth'
+import { useApi } from '~/composables/useApi'
 
 const router = useRouter()
 const auth = useAuth()
+const api = useApi()
 
 const formData = ref({
     username: '',
@@ -57,26 +59,15 @@ async function handleSignup() {
     error.value = null
 
     try {
-        // TODO Replace with actual API endpoint
-        const response = await fetch('/api/auth/signup', {
+        const data = await api.fetch<AuthResponse>('/auth/signup', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
+            body: {
                 username: formData.value.username,
                 email: formData.value.email,
                 password: formData.value.password,
                 roles: formData.value.roles
-            })
+            }
         })
-
-        if (!response.ok) {
-            const data = await response.json()
-            throw new Error(data.message || 'Signup failed')
-        }
-
-        const data = await response.json()
 
         // Store auth token and user data
         localStorage.setItem('authToken', data.token)
@@ -85,7 +76,8 @@ async function handleSignup() {
         // Redirect to home
         router.push('/')
     } catch (err: any) {
-        error.value = err.message || 'Signup failed. Please try again.'
+        // $fetch throws on error responses (4xx, 5xx)
+        error.value = err.data?.error || err.message || 'Signup failed. Please try again.'
     } finally {
         isLoading.value = false
     }

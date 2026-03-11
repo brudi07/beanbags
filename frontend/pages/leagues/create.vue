@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useApi } from '~/composables/useApi'
 import { useAuth } from '~/composables/useAuth'
 import type { CreateLeagueData } from '~/types/league'
 
 const router = useRouter()
 const auth = useAuth()
+const api = useApi()
 
 // Redirect if not organizer
 if (!auth.canCreateLeague.value) {
@@ -16,11 +18,12 @@ const formData = ref<CreateLeagueData>({
     name: '',
     description: '',
     format: '2v2',
-    maxTeams: 8,
-    startDate: '',
-    endDate: '',
+    games_per_match: 3,
+    max_teams: 8,
+    start_date: '',
+    weeks_of_play: 8,
     location: '',
-    isPublic: true
+    is_public: true
 })
 
 const isLoading = ref(false)
@@ -28,7 +31,7 @@ const error = ref<string | null>(null)
 const success = ref(false)
 
 async function handleCreateLeague() {
-    if (!formData.value.name || !formData.value.location || !formData.value.startDate) {
+    if (!formData.value.name || !formData.value.location || !formData.value.start_date) {
         error.value = 'Please fill in all required fields'
         return
     }
@@ -38,21 +41,12 @@ async function handleCreateLeague() {
     success.value = false
 
     try {
-        const response = await fetch('/api/leagues', {
+        // ✅ $fetch returns parsed JSON directly - no .json() needed
+        const league = await api.fetch<{ id: number; message: string }>('/leagues', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-            },
-            body: JSON.stringify(formData.value)
+            body: formData.value
         })
 
-        if (!response.ok) {
-            const data = await response.json()
-            throw new Error(data.message || 'Failed to create league')
-        }
-
-        const league = await response.json()
         success.value = true
 
         // Redirect to league page after short delay
@@ -60,7 +54,7 @@ async function handleCreateLeague() {
             router.push(`/leagues/${league.id}`)
         }, 1500)
     } catch (err: any) {
-        error.value = err.message || 'Failed to create league. Please try again.'
+        error.value = err.data?.error || err.message || 'Failed to create league. Please try again.'
     } finally {
         isLoading.value = false
     }
@@ -106,7 +100,7 @@ async function handleCreateLeague() {
                         placeholder="Tell players about your league, rules, schedule, etc." />
                 </div>
 
-                <!-- Format and Max Teams -->
+                <!-- Format and Games Per Match -->
                 <div class="grid grid-cols-2 gap-4">
 
                     <!-- Format -->
@@ -121,18 +115,31 @@ async function handleCreateLeague() {
                         </select>
                     </div>
 
-                    <!-- Max Teams -->
+                    <!-- Games Per Match -->
                     <div>
-                        <label for="maxTeams" class="block text-sm font-semibold text-gray-700 mb-2">
-                            Max Teams <span class="text-red-500">*</span>
+                        <label for="gamesPerMatch" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Match Format <span class="text-red-500">*</span>
                         </label>
-                        <input id="maxTeams" v-model.number="formData.maxTeams" type="number" min="2" max="64" required
-                            class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                        <select id="gamesPerMatch" v-model.number="formData.games_per_match"
+                            class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option :value="1">Best of 1</option>
+                            <option :value="3">Best of 3</option>
+                            <option :value="5">Best of 5</option>
+                        </select>
                     </div>
 
                 </div>
 
-                <!-- Start and End Dates -->
+                <!-- Max Teams -->
+                <div>
+                    <label for="maxTeams" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Maximum Teams <span class="text-red-500">*</span>
+                    </label>
+                    <input id="maxTeams" v-model.number="formData.max_teams" type="number" min="2" max="64" required
+                        class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                </div>
+
+                <!-- Start Date and Weeks of Play -->
                 <div class="grid grid-cols-2 gap-4">
 
                     <!-- Start Date -->
@@ -140,17 +147,21 @@ async function handleCreateLeague() {
                         <label for="startDate" class="block text-sm font-semibold text-gray-700 mb-2">
                             Start Date <span class="text-red-500">*</span>
                         </label>
-                        <input id="startDate" v-model="formData.startDate" type="date" required
+                        <input id="startDate" v-model="formData.start_date" type="date" required
                             class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
                     </div>
 
-                    <!-- End Date -->
+                    <!-- Weeks of Play -->
                     <div>
-                        <label for="endDate" class="block text-sm font-semibold text-gray-700 mb-2">
-                            End Date (Optional)
+                        <label for="weeksOfPlay" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Weeks of Play <span class="text-red-500">*</span>
                         </label>
-                        <input id="endDate" v-model="formData.endDate" type="date"
-                            class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                        <input id="weeksOfPlay" v-model.number="formData.weeks_of_play" type="number" min="1" max="52"
+                            required
+                            class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="e.g., 8" />
+                        <p class="text-xs text-gray-500 mt-1">League will end {{ formData.weeks_of_play }} weeks after
+                            start date</p>
                     </div>
 
                 </div>
@@ -168,7 +179,7 @@ async function handleCreateLeague() {
                 <!-- Public/Private -->
                 <div class="bg-gray-50 rounded-lg p-4">
                     <label class="flex items-center cursor-pointer">
-                        <input v-model="formData.isPublic" type="checkbox"
+                        <input v-model="formData.is_public" type="checkbox"
                             class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500" />
                         <div class="ml-3">
                             <span class="font-semibold text-gray-900">Public League</span>
@@ -190,7 +201,7 @@ async function handleCreateLeague() {
                             : 'bg-blue-600 hover:bg-blue-700'">
                         <span v-if="isLoading">Creating...</span>
                         <span v-else-if="success">Created!</span>
-                        <span v-else>Create League</span>
+                        <span v-else">Create League</span>
                     </button>
 
                     <button type="button" @click="router.push('/leagues')"

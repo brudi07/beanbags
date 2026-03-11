@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useApi } from '~/composables/useApi'
 import { useAuth } from '~/composables/useAuth'
+import type { AuthResponse } from '~/types/user'
 
 const router = useRouter()
 const auth = useAuth()
+const api = useApi()
 
 const username = ref('')
 const password = ref('')
@@ -21,33 +24,25 @@ async function handleLogin() {
     error.value = null
 
     try {
-        // TODO Replace with actual API endpoint
-        const response = await fetch('/api/auth/login', {
+        const data = await api.fetch<AuthResponse>('/auth/login', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
+            body: {
                 username: username.value,
-                password: password.value,
-            })
+                password: password.value
+            }
         })
 
-        if (!response.ok) {
-            const data = await response.json()
-            throw new Error(data.message || 'Invalid credentials')
-        }
-
-        const data = await response.json()
-
-        // Store auth token and user data
+        // Store auth token
         localStorage.setItem('authToken', data.token)
+
+        // Save user in auth store
         auth.setUser(data.user)
 
-        // Redirect to home or dashboard
+        // Redirect
         router.push('/')
+
     } catch (err: any) {
-        error.value = err.message || 'Login failed. Please try again.'
+        error.value = err?.data?.error || err.message || 'Invalid credentials'
     } finally {
         isLoading.value = false
     }

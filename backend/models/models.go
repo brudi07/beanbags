@@ -2,6 +2,41 @@ package models
 
 import "time"
 
+// =========================
+// User and Authentication
+// =========================
+
+type User struct {
+	ID           int       `json:"id"`
+	Username     string    `json:"username"`
+	Email        string    `json:"email"`
+	PasswordHash string    `json:"-"` // Never expose in JSON
+	Roles        []string  `json:"roles"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+type RegisterRequest struct {
+	Username string   `json:"username" binding:"required"`
+	Email    string   `json:"email" binding:"required,email"`
+	Password string   `json:"password" binding:"required,min=6"`
+	Roles    []string `json:"roles" binding:"required"`
+}
+
+type LoginRequest struct {
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
+
+type AuthResponse struct {
+	Token string `json:"token"`
+	User  User   `json:"user"`
+}
+
+// =========================
+// Core Entities
+// =========================
+
 type Team struct {
 	ID        int       `json:"id"`
 	Name      string    `json:"name"`
@@ -10,10 +45,92 @@ type Team struct {
 
 type Player struct {
 	ID        int       `json:"id"`
+	UserID    int       `json:"user_id"`
 	Name      string    `json:"name"`
-	TeamID    int       `json:"team_id"`
+	TeamID    *int      `json:"team_id,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 }
+
+// =========================
+// Leagues
+// =========================
+
+type League struct {
+	ID            int       `json:"id"`
+	Name          string    `json:"name"`
+	Description   string    `json:"description"`
+	OrganizerID   int       `json:"organizer_id"`
+	OrganizerName string    `json:"organizer_name"`
+	Format        string    `json:"format"`
+	GamesPerMatch int       `json:"games_per_match"`
+	MaxTeams      int       `json:"max_teams"`
+	CurrentTeams  int       `json:"current_teams"`
+	StartDate     string    `json:"start_date"`
+	WeeksOfPlay   int       `json:"weeks_of_play"`
+	Location      string    `json:"location"`
+	IsPublic      bool      `json:"is_public"`
+	Status        string    `json:"status"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+type CreateLeagueRequest struct {
+	Name          string `json:"name" binding:"required"`
+	Description   string `json:"description"`
+	Format        string `json:"format" binding:"required,oneof=1v1 2v2"`
+	GamesPerMatch int    `json:"games_per_match" binding:"required,oneof=1 3 5"`
+	MaxTeams      int    `json:"max_teams" binding:"required,min=2,max=64"`
+	StartDate     string `json:"start_date" binding:"required"`
+	WeeksOfPlay   int    `json:"weeks_of_play" binding:"required,min=1,max=52"`
+	Location      string `json:"location" binding:"required"`
+	IsPublic      bool   `json:"is_public"`
+}
+
+type LeagueMember struct {
+	LeagueID   int       `json:"league_id"`
+	PlayerID   int       `json:"player_id"`
+	PlayerName string    `json:"player_name"`
+	JoinedAt   time.Time `json:"joined_at"`
+}
+
+type LeagueGame struct {
+	ID             int       `json:"id"`
+	LeagueID       int       `json:"league_id"`
+	MatchNumber    int       `json:"match_number"`
+	GameNumber     int       `json:"game_number"`
+	ScheduledDate  string    `json:"scheduled_date"`
+	Team1          string    `json:"team1"`
+	Team2          string    `json:"team2"`
+	Team1PlayerIDs []string  `json:"team1_player_ids"`
+	Team2PlayerIDs []string  `json:"team2_player_ids"`
+	Status         string    `json:"status"`
+	WinningTeam    *int      `json:"winning_team,omitempty"`
+	GameID         *int      `json:"game_id,omitempty"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+type LeagueSchedule struct {
+	Date  string       `json:"date"`
+	Games []LeagueGame `json:"games"`
+}
+
+type LeagueStanding struct {
+	LeagueID      int     `json:"league_id"`
+	TeamID        int     `json:"team_id"`
+	TeamName      string  `json:"team_name"`
+	Wins          int     `json:"wins"`
+	Losses        int     `json:"losses"`
+	Ties          int     `json:"ties"`
+	PointsFor     int     `json:"points_for"`
+	PointsAgainst int     `json:"points_against"`
+	PointDiff     int     `json:"point_diff"`
+	WinPercentage float64 `json:"win_percentage"`
+}
+
+// =========================
+// Matches and Games
+// =========================
 
 type Match struct {
 	ID            int        `json:"id"`
@@ -26,6 +143,7 @@ type Match struct {
 	EndTime       *time.Time `json:"end_time,omitempty"`
 	Location      string     `json:"location"`
 	Notes         string     `json:"notes"`
+	Status        string     `json:"status"`
 }
 
 type Round struct {
@@ -34,31 +152,74 @@ type Round struct {
 	RoundNumber int       `json:"round_number"`
 	Team1Score  int       `json:"team1_score"`
 	Team2Score  int       `json:"team2_score"`
-	EndedInBust bool      `json:"ended_in_bust"`
+	Team1Points int       `json:"team1_points"`
+	Team2Points int       `json:"team2_points"`
+	Team1Busted bool      `json:"team1_busted"`
+	Team2Busted bool      `json:"team2_busted"`
+	Throws      []Throw   `json:"throws,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 }
 
 type Throw struct {
-	ID            int       `json:"id"`
-	RoundID       int       `json:"round_id"`
-	PlayerID      int       `json:"player_id"`
-	ThrowNumber   int       `json:"throw_number"`
-	ThrowType     string    `json:"throw_type"`
-	XPosition     float64   `json:"x_position"`
-	YPosition     float64   `json:"y_position"`
-	PointsEarned  int       `json:"points_earned"`
-	CausedBust    bool      `json:"caused_bust"`
-	AutoThrownOff bool      `json:"auto_thrown_off"`
-	CreatedAt     time.Time `json:"created_at"`
+	ID           int       `json:"id"`
+	RoundID      int       `json:"round_id"`
+	PlayerID     int       `json:"player_id"`
+	Team         int       `json:"team"`
+	ThrowNumber  int       `json:"throw_number"`
+	Result       string    `json:"result"`
+	XPosition    float64   `json:"x_position"`
+	YPosition    float64   `json:"y_position"`
+	Rotation     float64   `json:"rotation"`
+	PointsEarned int       `json:"points_earned"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
-type League struct {
-	ID        int       `json:"id"`
-	Name      string    `json:"name"`
-	StartDate time.Time `json:"start_date"`
-	EndDate   time.Time `json:"end_date"`
-	CreatedAt time.Time `json:"created_at"`
+type RoundResult struct {
+	Round       int     `json:"round"`
+	Throws      []Throw `json:"throws"`
+	Team1Points int     `json:"team1_points"`
+	Team2Points int     `json:"team2_points"`
+	Team1Busted bool    `json:"team1_busted,omitempty"`
+	Team2Busted bool    `json:"team2_busted,omitempty"`
 }
+
+type GameSubmitRequest struct {
+	Winner       int           `json:"winner"`
+	FinalScore   FinalScore    `json:"final_score"`
+	TotalRounds  int           `json:"total_rounds"`
+	RoundHistory []RoundResult `json:"round_history"`
+	CompletedAt  string        `json:"completed_at"`
+}
+
+type FinalScore struct {
+	Team1 int `json:"team1"`
+	Team2 int `json:"team2"`
+}
+
+// =========================
+// Player Stats
+// =========================
+
+type PlayerStats struct {
+	ID                   int       `json:"id"`
+	PlayerID             int       `json:"player_id"`
+	LeagueID             *int      `json:"league_id,omitempty"`
+	TotalThrows          int       `json:"total_throws"`
+	Holes                int       `json:"holes"`
+	Boards               int       `json:"boards"`
+	Misses               int       `json:"misses"`
+	ITOs                 int       `json:"itos"`
+	Busts                int       `json:"busts"`
+	PointsContributed    int       `json:"points_contributed"`
+	Accuracy             int       `json:"accuracy"`
+	PointsPerRound       float64   `json:"points_per_round"`
+	DifferentialPerRound float64   `json:"differential_per_round"`
+	UpdatedAt            time.Time `json:"updated_at"`
+}
+
+// =========================
+// Tournaments
+// =========================
 
 type Tournament struct {
 	ID        int       `json:"id"`
@@ -77,13 +238,6 @@ type TournamentInput struct {
 	LeagueID *int   `json:"league_id"`
 	Format   string `json:"format" binding:"required"`
 	TeamIDs  []int  `json:"team_ids" binding:"required"`
-}
-
-type LeagueStanding struct {
-	TeamID   int    `json:"team_id"`
-	TeamName string `json:"team_name"`
-	Wins     int    `json:"wins"`
-	Losses   int    `json:"losses"`
 }
 
 type TournamentMatch struct {
