@@ -128,7 +128,7 @@ async function startGame(game: LeagueGame) {
         const params = new URLSearchParams({
             leagueId,
             leagueGameId: String(game.id),
-            format: league.value!.format,
+            format: String(league.value!.format),
             bestOf: String(league.value!.games_per_match),
             t1p1: team1Names[0] || '',
             t2p1: team2Names[0] || '',
@@ -199,6 +199,30 @@ async function leaveLeague() {
 
 function editLeague() {
     router.push(`/leagues/${leagueId}/edit`)
+}
+
+async function scheduleGames() {
+    if (!confirm('Generate the league schedule? This cannot be undone.')) {
+        return
+    }
+
+    try {
+        const result = await api.fetch<{
+            message: string
+            total_matches: number
+            total_games: number
+        }>(`/leagues/${leagueId}/generate-schedule`, {
+            method: 'POST'
+        })
+
+        alert(`Schedule created!
+            Matches: ${result.total_matches}
+            Games: ${result.total_games}`)
+
+        await fetchLeagueData()
+    } catch (err: any) {
+        alert(err.data?.error || err.message)
+    }
 }
 
 function getPlayerNames(playerIds: number[]): string {
@@ -287,6 +311,11 @@ onMounted(() => {
                                 Edit League
                             </button>
 
+                           <button v-if="isOrganizer && schedule.length === 0" @click="scheduleGames"
+                                class="px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700">
+                                Schedule Games
+                            </button>
+
                             <!-- Allow organizer to join as player if not already a member -->
                             <button v-if="!isMember && league.current_teams < league.max_teams" @click="joinLeague"
                                 class="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700">
@@ -371,7 +400,7 @@ onMounted(() => {
                                 <!-- Current Date Display -->
                                 <div class="text-center">
                                     <p class="text-2xl font-bold text-gray-900">
-                                        {{ selectedDate ? new Date(selectedDate).toLocaleDateString('en-US', {
+                                        {{ selectedDate ? new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', {
                                             weekday: 'long',
                                             month: 'long',
                                             day: 'numeric',
@@ -436,9 +465,17 @@ onMounted(() => {
                                             {{ getPlayerNames(game.team2_player_ids) }}
                                         </div>
 
-                                        <div v-if="game.winning_team" class="text-sm text-green-600 font-semibold">
-                                            Winner: {{ game.winning_team === 1 ? getPlayerNames(game.team1_player_ids) :
-                                                getPlayerNames(game.team2_player_ids) }}
+                                        <div v-if="game.status === 'completed' && game.team1_score != null" class="mt-2 flex items-center gap-3">
+                                            <span class="text-2xl font-bold" :class="game.winning_team === 1 ? 'text-green-600' : 'text-gray-500'">
+                                                {{ game.team1_score }}
+                                            </span>
+                                            <span class="text-gray-400 font-semibold">–</span>
+                                            <span class="text-2xl font-bold" :class="game.winning_team === 2 ? 'text-green-600' : 'text-gray-500'">
+                                                {{ game.team2_score }}
+                                            </span>
+                                            <span class="text-sm text-green-600 font-semibold ml-1">
+                                                ({{ game.winning_team === 1 ? getPlayerNames(game.team1_player_ids) : getPlayerNames(game.team2_player_ids) }} wins)
+                                            </span>
                                         </div>
                                     </div>
 

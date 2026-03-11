@@ -240,40 +240,41 @@ export const useScoringStore = defineStore('scoring', {
         },
 
         async submitGameResults(gameId: string) {
-            // This will submit the final game results to your backend
-            // Customize the payload structure based on your API needs
+            const token = localStorage.getItem('authToken')
 
             const gameData = {
-                gameId,
                 winner: this.gameWinner,
-                finalScore: {
+                final_score: {
                     team1: this.team1Score,
                     team2: this.team2Score
                 },
-                totalRounds: this.round - 1,
-                roundHistory: this.roundHistory,
-                completedAt: new Date().toISOString()
+                total_rounds: this.round - 1,
+                round_history: this.roundHistory.map(r => ({
+                    round: r.round,
+                    throws: [],
+                    team1_points: r.team1Points,
+                    team2_points: r.team2Points,
+                    team1_busted: r.team1Busted ?? false,
+                    team2_busted: r.team2Busted ?? false,
+                })),
+                completed_at: new Date().toISOString()
             }
 
-            try {
-                // Replace this with your actual API endpoint
-                const response = await fetch(`/api/games/${gameId}/complete`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(gameData)
-                })
+            const response = await fetch(`http://localhost:8080/api/games/${gameId}/complete`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(gameData)
+            })
 
-                if (!response.ok) {
-                    throw new Error('Failed to submit game results')
-                }
-
-                return await response.json()
-            } catch (error) {
-                console.error('Error submitting game results:', error)
-                throw error
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({ error: 'Unknown error' }))
+                throw new Error(err.error || 'Failed to submit game results')
             }
+
+            return await response.json()
         }
 
     }

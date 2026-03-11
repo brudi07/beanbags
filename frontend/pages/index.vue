@@ -18,7 +18,7 @@
         to="/games/new"
         class="bg-blue-600 text-white px-6 py-3 rounded-lg"
       >
-        Start New Game
+        Start Pickup Game
       </NuxtLink>
 
     </div>

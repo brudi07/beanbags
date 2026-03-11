@@ -10,6 +10,7 @@ import PlayerStatsPanel from '~/components/scoring/PlayerStatsPanel.vue'
 
 const route = useRoute()
 const router = useRouter()
+const leagueId = route.query.leagueId as string | undefined
 const scoringStore = useScoringStore()
 const playerStore = usePlayerStore()
 
@@ -35,7 +36,7 @@ const buttonText = computed(() => {
 })
 
 const buttonClass = computed(() => {
-  if (scoringStore.gameCompleted && allBagsPlaced.value) {
+  if (scoringStore.gameCompleted) {
     return 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
   }
   if (allBagsPlaced.value) {
@@ -45,7 +46,7 @@ const buttonClass = computed(() => {
 })
 
 async function handleButtonClick() {
-  if (!allBagsPlaced.value) return
+  if (!allBagsPlaced.value && !scoringStore.gameCompleted) return
 
   if (scoringStore.gameCompleted) {
     // Submit final score
@@ -65,7 +66,7 @@ async function submitGameResults() {
     await scoringStore.submitGameResults(gameId)
 
     // Navigate to game results or games list
-    router.push(`/games/${gameId}/results`) // Or wherever you want to go after submission
+    router.push(leagueId ? `/leagues/${leagueId}` : '/')
   } catch (error) {
     submitError.value = 'Failed to submit game results. Please try again.'
     console.error('Submit error:', error)
@@ -124,7 +125,7 @@ async function submitGameResults() {
     <!-- Score Round / Submit Button -->
     <div class="flex flex-col items-center gap-2 w-full">
       <button class="px-6 py-3 rounded-lg font-semibold transition-all" :class="buttonClass"
-        :disabled="!allBagsPlaced || isSubmitting" @click="handleButtonClick">
+        :disabled="(!allBagsPlaced && !scoringStore.gameCompleted) || isSubmitting" @click="handleButtonClick">
         <span v-if="isSubmitting">Submitting...</span>
         <span v-else>{{ buttonText }}</span>
       </button>

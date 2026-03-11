@@ -107,6 +107,8 @@ type LeagueGame struct {
 	Team2PlayerIDs []int     `json:"team2_player_ids"`
 	Status         string    `json:"status"`
 	WinningTeam    *int      `json:"winning_team,omitempty"`
+	Team1Score     *int      `json:"team1_score,omitempty"`
+	Team2Score     *int      `json:"team2_score,omitempty"`
 	GameID         *int      `json:"game_id,omitempty"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
@@ -196,27 +198,6 @@ type GameSubmitRequest struct {
 type FinalScore struct {
 	Team1 int `json:"team1"`
 	Team2 int `json:"team2"`
-}
-
-// =========================
-// Player Stats
-// =========================
-
-type PlayerStats struct {
-	ID                   int       `json:"id"`
-	PlayerID             int       `json:"player_id"`
-	LeagueID             *int      `json:"league_id,omitempty"`
-	TotalThrows          int       `json:"total_throws"`
-	Holes                int       `json:"holes"`
-	Boards               int       `json:"boards"`
-	Misses               int       `json:"misses"`
-	ITOs                 int       `json:"itos"`
-	Busts                int       `json:"busts"`
-	PointsContributed    int       `json:"points_contributed"`
-	Accuracy             int       `json:"accuracy"`
-	PointsPerRound       float64   `json:"points_per_round"`
-	DifferentialPerRound float64   `json:"differential_per_round"`
-	UpdatedAt            time.Time `json:"updated_at"`
 }
 
 // =========================

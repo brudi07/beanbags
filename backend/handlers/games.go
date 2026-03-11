@@ -263,6 +263,13 @@ func CompleteGame(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
+		// Mark the league game as completed and store final scores (best-effort, outside transaction)
+		db.Exec(`
+			UPDATE league_games
+			SET status = 'completed', winning_team = ?, team1_score = ?, team2_score = ?
+			WHERE game_id = ?
+		`, req.Winner, req.FinalScore.Team1, req.FinalScore.Team2, matchID)
+
 		c.JSON(http.StatusOK, gin.H{"message": "Game completed successfully"})
 	}
 }

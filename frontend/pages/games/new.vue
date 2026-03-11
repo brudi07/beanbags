@@ -72,13 +72,14 @@ async function startGame() {
         format: gameFormat.value,
         bestOf: bestOf.value,
         players: playerNames,
-        leagueGameId
+        leagueGameId: leagueGameId ? parseInt(leagueGameId) : undefined
       }
     })
 
     playerStore.setupGame(gameFormat.value, playerNames)
 
-    router.push(`/games/${game.id}`)
+    const dest = leagueId ? `/games/${game.id}?leagueId=${leagueId}` : `/games/${game.id}`
+    router.push(dest)
   } catch (err: any) {
     alert(err.data?.error || err.message)
   }

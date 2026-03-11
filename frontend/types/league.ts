@@ -49,6 +49,8 @@ export interface LeagueGame {
     team2_player_ids: number[]  // Player IDs for team 2
     status: 'scheduled' | 'in_progress' | 'completed'
     winning_team?: 1 | 2  // Which team won (1 or 2)
+    team1_score?: number
+    team2_score?: number
     game_id?: number
     created_at: string
     updated_at: string

@@ -90,8 +90,9 @@ func main() {
 		authorized.POST("/players", handlers.CreatePlayer(db))
 		authorized.GET("/players", handlers.GetPlayers(db))
 		authorized.GET("/players/me", handlers.GetMyPlayer(db))
+		authorized.GET("/players/me/stats", handlers.GetMyStats(db))
+		authorized.GET("/players/me/games", handlers.GetMyGames(db))
 		authorized.GET("/players/:id", handlers.GetPlayer(db))
-		authorized.GET("/players/:id/stats", handlers.GetPlayerStats(db))
 		authorized.GET("/players/:id/heatmap", handlers.GetPlayerHeatmap(db))
 
 		// Rounds & Throws

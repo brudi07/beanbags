@@ -130,6 +130,8 @@ func runSchema(db *sql.DB) error {
 		team2_player_ids  TEXT NOT NULL,
 		status            TEXT CHECK(status IN ('scheduled', 'in_progress', 'completed')) DEFAULT 'scheduled',
 		winning_team      INTEGER CHECK(winning_team IN (1, 2)),
+		team1_score       INTEGER,
+		team2_score       INTEGER,
 		game_id           INTEGER,
 		created_at        DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at        DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -209,25 +211,6 @@ func runSchema(db *sql.DB) error {
 	-- Stats and Standings
 	-- =========================
 
-	CREATE TABLE IF NOT EXISTS player_stats (
-	    id                      INTEGER PRIMARY KEY AUTOINCREMENT,
-	    player_id               INTEGER NOT NULL,
-	    league_id               INTEGER REFERENCES leagues(id) ON DELETE CASCADE,
-	    total_throws            INTEGER DEFAULT 0,
-	    holes                   INTEGER DEFAULT 0,
-	    boards                  INTEGER DEFAULT 0,
-	    misses                  INTEGER DEFAULT 0,
-	    itos                    INTEGER DEFAULT 0,
-	    busts                   INTEGER DEFAULT 0,
-	    points_contributed      INTEGER DEFAULT 0,
-	    accuracy                INTEGER DEFAULT 0,
-	    points_per_round        REAL DEFAULT 0,
-	    differential_per_round  REAL DEFAULT 0,
-	    updated_at              DATETIME DEFAULT CURRENT_TIMESTAMP,
-	    FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE,
-	    UNIQUE(player_id, league_id)
-	);
-
 	CREATE TABLE IF NOT EXISTS league_standings (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		league_id INTEGER REFERENCES leagues(id) ON DELETE CASCADE,
@@ -272,5 +255,5 @@ func runSchema(db *sql.DB) error {
 		}
 	}
 
-return nil
+	return nil
 }

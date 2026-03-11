@@ -367,7 +367,7 @@ func GetLeagueSchedule(db *sql.DB) gin.HandlerFunc {
 			SELECT
 				id, league_id, match_number, game_number, scheduled_date,
 				team1, team2, team1_player_ids, team2_player_ids,
-				status, winning_team, game_id, created_at, updated_at
+				status, winning_team, team1_score, team2_score, game_id, created_at, updated_at
 			FROM league_games
 			WHERE league_id = ?
 			ORDER BY scheduled_date, match_number, game_number
@@ -390,7 +390,7 @@ func GetLeagueSchedule(db *sql.DB) gin.HandlerFunc {
 				&game.ID, &game.LeagueID, &game.MatchNumber, &game.GameNumber,
 				&game.ScheduledDate, &game.Team1, &game.Team2,
 				&team1PlayerIDsJSON, &team2PlayerIDsJSON,
-				&game.Status, &game.WinningTeam, &game.GameID,
+				&game.Status, &game.WinningTeam, &game.Team1Score, &game.Team2Score, &game.GameID,
 				&game.CreatedAt, &game.UpdatedAt,
 			); err != nil {
 				continue

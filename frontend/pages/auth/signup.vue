@@ -101,6 +101,16 @@ async function handleSignup() {
 
                 <form @submit.prevent="handleSignup" class="space-y-5">
 
+                    <!-- Email Field -->
+                    <div>
+                        <label for="email" class="block text-sm font-medium text-gray-700 mb-2">
+                            Email Address
+                        </label>
+                        <input id="email" v-model="formData.email" type="email" autocomplete="email" required
+                            class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="Enter your email" />
+                    </div>
+
                     <!-- Name Fields -->
                     <div class="grid grid-cols-2 gap-4">
                         <div>
@@ -121,16 +131,6 @@ async function handleSignup() {
                                 class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 placeholder="Last name" />
                         </div>
-                    </div>
-
-                    <!-- Email Field -->
-                    <div>
-                        <label for="email" class="block text-sm font-medium text-gray-700 mb-2">
-                            Email Address
-                        </label>
-                        <input id="email" v-model="formData.email" type="email" autocomplete="email" required
-                            class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            placeholder="Enter your email" />
                     </div>
 
                     <!-- Role Selection -->
