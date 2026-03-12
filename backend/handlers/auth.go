@@ -1,9 +1,13 @@
 package handlers
 
 import (
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
+	"fmt"
 	"log"
 	"net/http"
+	"net/smtp"
 	"os"
 	"time"
 
@@ -259,4 +263,137 @@ func GetCurrentUserID(c *gin.Context) (int, bool) {
 	}
 	id, ok := userID.(int)
 	return id, ok
+}
+
+// ForgotPassword sends a password reset email
+func ForgotPassword(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			Email string `json:"email" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Email is required"})
+			return
+		}
+
+		// Always return the same message regardless of whether the email exists
+		successMsg := gin.H{"message": "If that email exists, a reset link has been sent"}
+
+		// Look up user
+		var userID int
+		err := db.QueryRow(`SELECT id FROM users WHERE email = ?`, req.Email).Scan(&userID)
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusOK, successMsg)
+			return
+		}
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+			return
+		}
+
+		// Clear any existing tokens for this user
+		db.Exec(`DELETE FROM password_resets WHERE user_id = ?`, userID)
+
+		// Generate a random 32-byte hex token
+		tokenBytes := make([]byte, 32)
+		if _, err := rand.Read(tokenBytes); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate reset token"})
+			return
+		}
+		token := hex.EncodeToString(tokenBytes)
+
+		expiresAt := time.Now().Add(time.Hour)
+		if _, err := db.Exec(
+			`INSERT INTO password_resets (user_id, token, expires_at) VALUES (?, ?, ?)`,
+			userID, token, expiresAt,
+		); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create reset token"})
+			return
+		}
+
+		appURL := os.Getenv("APP_URL")
+		if appURL == "" {
+			appURL = "http://localhost:3000"
+		}
+		resetURL := fmt.Sprintf("%s/auth/reset-password?token=%s", appURL, token)
+
+		if err := sendResetEmail(req.Email, resetURL); err != nil {
+			log.Printf("Failed to send reset email to %s: %v", req.Email, err)
+		}
+
+		c.JSON(http.StatusOK, successMsg)
+	}
+}
+
+// ResetPassword updates the user's password using a valid reset token
+func ResetPassword(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			Token    string `json:"token" binding:"required"`
+			Password string `json:"password" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		var userID int
+		var expiresAt time.Time
+		err := db.QueryRow(
+			`SELECT user_id, expires_at FROM password_resets WHERE token = ?`, req.Token,
+		).Scan(&userID, &expiresAt)
+
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid or expired reset link"})
+			return
+		}
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+			return
+		}
+
+		if time.Now().After(expiresAt) {
+			db.Exec(`DELETE FROM password_resets WHERE token = ?`, req.Token)
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Reset link has expired"})
+			return
+		}
+
+		hashed, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+			return
+		}
+
+		if _, err := db.Exec(`UPDATE users SET password_hash = ? WHERE id = ?`, string(hashed), userID); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
+			return
+		}
+
+		db.Exec(`DELETE FROM password_resets WHERE token = ?`, req.Token)
+
+		c.JSON(http.StatusOK, gin.H{"message": "Password updated successfully"})
+	}
+}
+
+func sendResetEmail(to, resetURL string) error {
+	host := os.Getenv("SMTP_HOST")
+	if host == "" {
+		log.Printf("Password reset link (SMTP not configured): %s\n", resetURL)
+		return nil
+	}
+
+	port := os.Getenv("SMTP_PORT")
+	user := os.Getenv("SMTP_USER")
+	pass := os.Getenv("SMTP_PASS")
+	from := os.Getenv("SMTP_FROM")
+
+	msg := fmt.Sprintf(
+		"From: %s\r\nTo: %s\r\nSubject: Reset your Beanbags password\r\n\r\n"+
+			"Click the link below to reset your password (expires in 1 hour):\r\n\r\n%s\r\n\r\n"+
+			"If you didn't request this, you can ignore this email.",
+		from, to, resetURL,
+	)
+
+	auth := smtp.PlainAuth("", user, pass, host)
+	return smtp.SendMail(host+":"+port, auth, from, []string{to}, []byte(msg))
 }

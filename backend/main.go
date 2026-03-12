@@ -44,10 +44,8 @@ func main() {
 	// Authentication
 	r.POST("/api/auth/signup", handlers.Register(db))
 	r.POST("/api/auth/login", handlers.Login(db))
-	r.POST("/api/auth/forgot-password", func(c *gin.Context) {
-		// TODO: Implement password reset
-		c.JSON(http.StatusNotImplemented, gin.H{"message": "Password reset not yet implemented"})
-	})
+	r.POST("/api/auth/forgot-password", handlers.ForgotPassword(db))
+	r.POST("/api/auth/reset-password", handlers.ResetPassword(db))
 
 	// Leagues - Read-only browsing
 	r.GET("/api/leagues/public", handlers.GetPublicLeagues(db))

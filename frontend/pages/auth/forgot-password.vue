@@ -19,22 +19,15 @@ async function handleResetPassword() {
     success.value = false
 
     try {
-        // TODO Replace with your actual API endpoint
-        const response = await api.fetch('/auth/forgot-password', {
+        await api.fetch('/auth/forgot-password', {
             method: 'POST',
-            body: {
-                email: email.value,
-            }
-        }) as Response
-
-        if (!response.ok) {
-            throw new Error('Failed to send reset email')
-        }
+            body: { email: email.value }
+        })
 
         success.value = true
         email.value = ''
     } catch (err: any) {
-        error.value = err.message || 'Failed to send reset email. Please try again.'
+        error.value = err.data?.error || err.message || 'Failed to send reset email. Please try again.'
     } finally {
         isLoading.value = false
     }
