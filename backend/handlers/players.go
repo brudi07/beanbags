@@ -74,7 +74,7 @@ func GetPlayers(db *sql.DB) gin.HandlerFunc {
 	}
 }
 
-// GetMyPlayer returns the current user's player profile with team info
+// GetMyPlayer returns the current user's player profile with all team memberships
 // GET /api/players/me
 func GetMyPlayer(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -84,23 +84,21 @@ func GetMyPlayer(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
+		type TeamInfo struct {
+			ID          int    `json:"id"`
+			Name        string `json:"name"`
+			MemberCount int    `json:"member_count"`
+		}
 		type MyPlayer struct {
-			ID       int     `json:"id"`
-			UserID   int     `json:"user_id"`
-			Name     string  `json:"name"`
-			TeamID   *int    `json:"team_id"`
-			TeamName *string `json:"team_name"`
+			ID     int        `json:"id"`
+			UserID int        `json:"user_id"`
+			Name   string     `json:"name"`
+			Teams  []TeamInfo `json:"teams"`
 		}
 
 		var player MyPlayer
-		var teamName sql.NullString
-		err := db.QueryRow(`
-			SELECT p.id, p.user_id, p.name, p.team_id, t.name
-			FROM players p
-			LEFT JOIN teams t ON p.team_id = t.id
-			WHERE p.user_id = ?
-		`, userID).Scan(&player.ID, &player.UserID, &player.Name, &player.TeamID, &teamName)
-
+		err := db.QueryRow(`SELECT id, user_id, name FROM players WHERE user_id = ?`, userID).
+			Scan(&player.ID, &player.UserID, &player.Name)
 		if err == sql.ErrNoRows {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Player profile not found"})
 			return
@@ -109,8 +107,26 @@ func GetMyPlayer(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		if teamName.Valid {
-			player.TeamName = &teamName.String
+		// Fetch all managed teams the player is on, with member count
+		rows, err := db.Query(`
+			SELECT t.id, t.name, COUNT(tm2.player_id) as member_count
+			FROM team_members tm
+			JOIN teams t ON tm.team_id = t.id
+			LEFT JOIN team_members tm2 ON tm2.team_id = t.id
+			WHERE tm.player_id = ? AND t.is_managed = 1
+			GROUP BY t.id
+		`, player.ID)
+		if err == nil {
+			defer rows.Close()
+			player.Teams = []TeamInfo{}
+			for rows.Next() {
+				var ti TeamInfo
+				if rows.Scan(&ti.ID, &ti.Name, &ti.MemberCount) == nil {
+					player.Teams = append(player.Teams, ti)
+				}
+			}
+		} else {
+			player.Teams = []TeamInfo{}
 		}
 
 		c.JSON(http.StatusOK, player)

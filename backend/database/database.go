@@ -71,7 +71,17 @@ func runSchema(db *sql.DB) error {
 	CREATE TABLE IF NOT EXISTS teams (
 	    id              INTEGER PRIMARY KEY AUTOINCREMENT,
 	    name            TEXT NOT NULL UNIQUE,
+	    is_managed      INTEGER DEFAULT 1,
 	    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE TABLE IF NOT EXISTS team_members (
+	    team_id         INTEGER NOT NULL,
+	    player_id       INTEGER NOT NULL,
+	    joined_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
+	    PRIMARY KEY (team_id, player_id),
+	    FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
+	    FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE
 	);
 
 	CREATE TABLE IF NOT EXISTS players (
@@ -240,6 +250,15 @@ func runSchema(db *sql.DB) error {
 		loser_next_match_id INTEGER REFERENCES matches(id),
 		position_in_loser_next INTEGER,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE TABLE IF NOT EXISTS team_league_interests (
+	    team_id   INTEGER NOT NULL,
+	    league_id INTEGER NOT NULL,
+	    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	    PRIMARY KEY (team_id, league_id),
+	    FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
+	    FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE CASCADE
 	);
 	`
 

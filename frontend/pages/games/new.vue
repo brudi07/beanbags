@@ -65,6 +65,14 @@ async function startGame() {
         : [team2Player1.value.trim(), team2Player2.value.trim()]
   }
 
+  playerStore.setupGame(gameFormat.value, playerNames)
+
+  // Pickup games are local-only — no backend storage
+  if (!isLeagueGame) {
+    router.push('/games/pickup')
+    return
+  }
+
   try {
     const game: any = await api.fetch('/games', {
       method: 'POST',
@@ -72,14 +80,11 @@ async function startGame() {
         format: gameFormat.value,
         bestOf: bestOf.value,
         players: playerNames,
-        leagueGameId: leagueGameId ? parseInt(leagueGameId) : undefined
+        leagueGameId: parseInt(leagueGameId!)
       }
     })
 
-    playerStore.setupGame(gameFormat.value, playerNames)
-
-    const dest = leagueId ? `/games/${game.id}?leagueId=${leagueId}` : `/games/${game.id}`
-    router.push(dest)
+    router.push(`/games/${game.id}?leagueId=${leagueId}`)
   } catch (err: any) {
     alert(err.data?.error || err.message)
   }

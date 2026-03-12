@@ -16,6 +16,9 @@ const league = ref<League | null>(null)
 const members = ref<any[]>([])
 const schedule = ref<LeagueSchedule[]>([])
 const standings = ref<any[]>([])
+const myPlayer = ref<any>(null)
+const myTeamMembers = ref<Record<number, any[]>>({})
+const showJoinPanel = ref(false)
 
 const isLoading = ref(true)
 const error = ref<string | null>(null)
@@ -38,8 +41,19 @@ const isOrganizer = computed(() =>
 )
 
 const isMember = computed(() =>
-    members.value.some(m => m.player_id === auth.currentUser.value?.id)
+    myPlayer.value != null && members.value.some(m => m.player_id === myPlayer.value?.id)
 )
+
+const memberTeams = computed(() => {
+    const teams: Record<number, { teamId: number, teamName: string, players: any[] }> = {}
+    for (const m of members.value) {
+        if (m.team_id) {
+            if (!teams[m.team_id]) teams[m.team_id] = { teamId: m.team_id, teamName: m.team_name, players: [] }
+            teams[m.team_id]!.players.push(m)
+        }
+    }
+    return Object.values(teams)
+})
 
 function canStartGame(game: LeagueGame): boolean {
     if (!auth.currentUser.value) return false
@@ -95,6 +109,17 @@ async function fetchLeagueData() {
         standings.value = standingsRes
 
         goToToday()
+
+        try {
+            myPlayer.value = await api.fetch<any>('/players/me')
+            // Fetch members for all the user's teams so the join panel can show them
+            const memberLoads = (myPlayer.value?.teams ?? []).map((t: any) =>
+                api.fetch<any[]>(`/teams/${t.id}/members`).then((m: any[]) => {
+                    myTeamMembers.value[t.id] = m
+                }).catch(() => {})
+            )
+            await Promise.all(memberLoads)
+        } catch {} // not critical — fails for non-players (organizer-only accounts)
     } catch (err: any) {
         error.value = err.data?.error || err.message
     } finally {
@@ -169,13 +194,13 @@ async function confirmReschedule() {
     }
 }
 
-async function joinLeague() {
+async function joinLeague(teamId?: number) {
     try {
-        // ✅ No Response cast needed
         await api.fetch(`/leagues/${leagueId}/join`, {
             method: 'POST',
+            body: teamId ? { team_id: teamId } : undefined
         })
-
+        showJoinPanel.value = false
         await fetchLeagueData()
     } catch (err: any) {
         alert(err.data?.error || err.message)
@@ -311,43 +336,54 @@ onMounted(() => {
                                 Edit League
                             </button>
 
-                           <button v-if="isOrganizer && schedule.length === 0" @click="scheduleGames"
+                           <button v-if="isOrganizer && schedule.length === 0 && league.current_teams >= 2" @click="scheduleGames"
                                 class="px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700">
                                 Schedule Games
                             </button>
+                            <p v-if="isOrganizer && schedule.length === 0 && league.current_teams < 2"
+                                class="text-xs text-gray-500 text-center">
+                                Need at least 2 teams to schedule
+                            </p>
 
                             <!-- Allow organizer to join as player if not already a member -->
-                            <button v-if="!isMember && league.current_teams < league.max_teams" @click="joinLeague"
+                            <button v-if="!isMember && league.current_teams < league.max_teams" @click="league.format === '2v2' ? showJoinPanel = true : joinLeague()"
                                 class="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700">
-                                Join as Player
+                                {{ league.format === '2v2' ? 'Join as Team' : 'Join as Player' }}
                             </button>
 
-                            <!-- Allow organizer to leave if they joined as player -->
+                            <!-- Allow organizer to leave if they joined as player/team -->
                             <button v-else-if="isMember" @click="leaveLeague"
                                 class="px-4 py-2 text-red-600 border-2 border-red-600 rounded-lg font-semibold hover:bg-red-50">
-                                Leave as Player
+                                {{ league.format === '2v2' ? 'Leave as Team' : 'Leave as Player' }}
                             </button>
                         </template>
 
                         <template v-else-if="isMember">
                             <button @click="leaveLeague"
                                 class="px-4 py-2 text-red-600 border-2 border-red-600 rounded-lg font-semibold hover:bg-red-50">
-                                Leave League
+                                {{ league.format === '2v2' ? 'Leave as Team' : 'Leave League' }}
                             </button>
                         </template>
 
                         <template v-else>
-                            <button v-if="league.current_teams < league.max_teams" @click="joinLeague"
-                                class="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700">
-                                {{ league.format === '2v2' ? 'Join as Team' : 'Join League' }}
-                            </button>
-                            <NuxtLink v-if="league.format === '2v2' && league.current_teams < league.max_teams"
-                                to="/teams"
-                                class="text-xs text-center text-blue-600 hover:underline mt-1">
-                                Manage your team
-                            </NuxtLink>
+                            <div v-if="league.current_teams < league.max_teams">
+                                <!-- 1v1: join directly -->
+                                <button v-if="league.format === '1v1'" @click="joinLeague()"
+                                    class="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700">
+                                    Join League
+                                </button>
+
+                                <!-- 2v2: open team confirmation panel -->
+                                <div v-else>
+                                    <button @click="showJoinPanel = !showJoinPanel"
+                                        class="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700">
+                                        Join as Team
+                                    </button>
+                                </div>
+                            </div>
                         </template>
                     </div>
+
                 </div>
             </div>
 
@@ -371,7 +407,7 @@ onMounted(() => {
                             class="px-6 py-4 font-semibold border-b-2 transition-colors" :class="activeTab === 'members'
                                 ? 'border-blue-600 text-blue-600'
                                 : 'border-transparent text-gray-500 hover:text-gray-700'">
-                            Members ({{ members.length }})
+                            Members ({{ league.format === '2v2' ? memberTeams.length : members.length }})
                         </button>
                     </nav>
                 </div>
@@ -553,15 +589,22 @@ onMounted(() => {
                         <div v-if="members.length === 0" class="text-center py-12 text-gray-500">
                             No members yet.
                         </div>
+                        <!-- 2v2: show teams -->
+                        <div v-else-if="league.format === '2v2'" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div v-for="team in memberTeams" :key="team.teamId" class="p-4 bg-gray-50 rounded-lg">
+                                <p class="font-semibold text-gray-900 mb-2">{{ team.teamName }}</p>
+                                <div class="space-y-1">
+                                    <p v-for="player in team.players" :key="player.player_id"
+                                        class="text-sm text-gray-600">{{ player.player_name }}</p>
+                                </div>
+                                <p class="text-xs text-gray-400 mt-2">Joined {{ new Date(team.players[0].joined_at).toLocaleDateString() }}</p>
+                            </div>
+                        </div>
+                        <!-- 1v1: show individual players -->
                         <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             <div v-for="member in members" :key="member.player_id" class="p-4 bg-gray-50 rounded-lg">
                                 <p class="font-semibold text-gray-900">{{ member.player_name }}</p>
-                                <p class="text-sm text-gray-600">Joined {{ new
-                                    Date(member.joined_at).toLocaleDateString() }}</p>
-                                <span v-if="member.player_id === league.organizer_id"
-                                    class="inline-block mt-2 px-2 py-1 bg-purple-100 text-purple-700 text-xs font-semibold rounded">
-                                    Organizer
-                                </span>
+                                <p class="text-sm text-gray-600">Joined {{ new Date(member.joined_at).toLocaleDateString() }}</p>
                             </div>
                         </div>
                     </div>
@@ -569,6 +612,56 @@ onMounted(() => {
                 </div>
             </div>
 
+        </div>
+
+        <!-- 2v2 Team Join Modal -->
+        <div v-if="showJoinPanel && league?.format === '2v2'"
+            class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+            @click.self="showJoinPanel = false">
+            <div class="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4">
+                <h3 class="text-xl font-bold text-gray-900 mb-4">Join as Team</h3>
+
+                <!-- No teams -->
+                <div v-if="!myPlayer?.teams?.length" class="text-center py-4">
+                    <p class="text-gray-700 mb-4">You need a team to join a 2v2 league.</p>
+                    <NuxtLink to="/teams"
+                        class="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700">
+                        Go to Teams →
+                    </NuxtLink>
+                </div>
+
+                <!-- Team list -->
+                <div v-else class="space-y-3">
+                    <p class="text-sm text-gray-600">Select a team to join with:</p>
+                    <div v-for="team in myPlayer.teams" :key="team.id" class="p-4 bg-gray-50 rounded-lg border">
+                        <p class="font-semibold text-gray-900 mb-2">{{ team.name }}</p>
+                        <!-- Team not full -->
+                        <div v-if="(myTeamMembers[team.id]?.length ?? 0) < 2">
+                            <p class="text-sm text-amber-600 mb-2">
+                                Needs 2 players ({{ myTeamMembers[team.id]?.length ?? 0 }}/2)
+                            </p>
+                            <NuxtLink to="/teams" class="text-sm text-blue-600 font-semibold hover:underline">
+                                Invite a partner →
+                            </NuxtLink>
+                        </div>
+                        <!-- Team ready -->
+                        <div v-else>
+                            <p class="text-sm text-gray-500 mb-3">
+                                {{ myTeamMembers[team.id]?.map((m: any) => m.name).join(' & ') }}
+                            </p>
+                            <button @click="joinLeague(team.id)"
+                                class="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 text-sm">
+                                Confirm Join
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <button @click="showJoinPanel = false"
+                    class="mt-4 w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300">
+                    Cancel
+                </button>
+            </div>
         </div>
 
         <!-- Reschedule Modal -->

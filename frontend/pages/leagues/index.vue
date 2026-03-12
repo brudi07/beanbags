@@ -131,7 +131,11 @@ function createLeague() {
 
 onMounted(() => {
     fetchPublicLeagues()
-    fetchMyLeagues()
+    if (auth.isAuthenticated.value) {
+        fetchMyLeagues()
+    } else {
+        isLoadingMy.value = false
+    }
 })
 </script>
 
@@ -229,9 +233,9 @@ onMounted(() => {
                             class="flex-1 py-2 px-4 rounded-lg font-semibold text-gray-700 border-2 border-gray-300 hover:bg-gray-50 transition-colors">
                             View
                         </button>
-                        <button v-if="league.current_teams < league.max_teams" @click="joinLeague(league.id)"
+                        <button v-if="league.current_teams < league.max_teams" @click="league.format === '2v2' ? viewLeague(league.id) : joinLeague(league.id)"
                             class="flex-1 py-2 px-4 rounded-lg font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors">
-                            Join
+                            {{ league.format === '2v2' ? 'Join as Team' : 'Join' }}
                         </button>
                     </div>
                 </div>
@@ -239,7 +243,7 @@ onMounted(() => {
         </div>
 
         <!-- MY LEAGUES SECTION -->
-        <div class="border-t-4 border-gray-200 pt-12">
+        <div v-if="auth.isAuthenticated.value" class="border-t-4 border-gray-200 pt-12">
             <div class="flex items-center justify-between mb-6">
                 <div>
                     <h2 class="text-3xl font-bold text-gray-900 mb-2">My Leagues</h2>

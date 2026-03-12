@@ -19,7 +19,7 @@ export const useApi = () => {
                 }
             })
         } catch (err: any) {
-            if (err?.status === 401 || err?.statusCode === 401) {
+            if ((err?.status === 401 || err?.statusCode === 401) && auth.isAuthenticated.value) {
                 auth.clearUser()
                 router.push('/auth/login')
             }

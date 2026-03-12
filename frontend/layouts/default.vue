@@ -28,10 +28,10 @@ function handleLogin() {
       <!-- Left side navigation -->
       <div class="flex gap-6">
         <NuxtLink to="/" class="font-medium hover:text-blue-600 transition-colors">Home</NuxtLink>
-        <NuxtLink to="/leagues" class="font-medium hover:text-blue-600 transition-colors">Leagues</NuxtLink>
         <NuxtLink to="/teams" class="font-medium hover:text-blue-600 transition-colors">Teams</NuxtLink>
-        <NuxtLink to="/stats" class="font-medium hover:text-blue-600 transition-colors">Stats</NuxtLink>
-        <NuxtLink to="/history" class="font-medium hover:text-blue-600 transition-colors">History</NuxtLink>
+        <NuxtLink to="/leagues" class="font-medium hover:text-blue-600 transition-colors">Leagues</NuxtLink>
+        <NuxtLink v-if="auth.isAuthenticated.value" to="/stats" class="font-medium hover:text-blue-600 transition-colors">Stats</NuxtLink>
+        <NuxtLink v-if="auth.isAuthenticated.value" to="/history" class="font-medium hover:text-blue-600 transition-colors">History</NuxtLink>
       </div>
 
       <!-- Right side - Login/User menu -->

@@ -93,6 +93,8 @@ type LeagueMember struct {
 	PlayerID   int       `json:"player_id"`
 	PlayerName string    `json:"player_name"`
 	JoinedAt   time.Time `json:"joined_at"`
+	TeamID     int       `json:"team_id"`
+	TeamName   string    `json:"team_name"`
 }
 
 type LeagueGame struct {

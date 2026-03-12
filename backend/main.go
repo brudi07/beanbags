@@ -49,6 +49,18 @@ func main() {
 		c.JSON(http.StatusNotImplemented, gin.H{"message": "Password reset not yet implemented"})
 	})
 
+	// Leagues - Read-only browsing
+	r.GET("/api/leagues/public", handlers.GetPublicLeagues(db))
+	r.GET("/api/leagues/:id", handlers.GetLeagueByID(db))
+	r.GET("/api/leagues/:id/members", handlers.GetLeagueMembers(db))
+	r.GET("/api/leagues/:id/schedule", handlers.GetLeagueSchedule(db))
+	r.GET("/api/leagues/:id/standings", handlers.GetLeagueStandings(db))
+
+	// Teams - Read-only browsing
+	r.GET("/api/teams", handlers.GetTeams(db))
+	r.GET("/api/teams/:id", handlers.GetTeam(db))
+	r.GET("/api/teams/:id/members", handlers.GetTeamMembers(db))
+
 	// =========================
 	// Protected Routes (Auth Required)
 	// =========================
@@ -56,15 +68,8 @@ func main() {
 	authorized := r.Group("/api")
 	authorized.Use(handlers.AuthMiddleware())
 	{
-		// Leagues - Public Browse
-		authorized.GET("/leagues/public", handlers.GetPublicLeagues(db))
+		// Leagues - Personal & Actions
 		authorized.GET("/leagues/my-leagues", handlers.GetMyLeagues(db))
-		authorized.GET("/leagues/:id", handlers.GetLeagueByID(db))
-		authorized.GET("/leagues/:id/members", handlers.GetLeagueMembers(db))
-		authorized.GET("/leagues/:id/schedule", handlers.GetLeagueSchedule(db))
-		authorized.GET("/leagues/:id/standings", handlers.GetLeagueStandings(db))
-
-		// Leagues - Member Actions
 		authorized.POST("/leagues/:id/join", handlers.JoinLeague(db))
 		authorized.POST("/leagues/:id/leave", handlers.LeaveLeague(db))
 
@@ -80,13 +85,14 @@ func main() {
 		authorized.POST("/games/:id/complete", handlers.CompleteGame(db))
 		authorized.GET("/games/:id/results", handlers.GetGameResults(db))
 
-		// Teams & Players
+		// Teams - Actions
 		authorized.POST("/teams", handlers.CreateTeam(db))
-		authorized.GET("/teams", handlers.GetTeams(db))
-		authorized.GET("/teams/:id", handlers.GetTeam(db))
-		authorized.GET("/teams/:id/members", handlers.GetTeamMembers(db))
 		authorized.POST("/teams/:id/join", handlers.JoinTeam(db))
 		authorized.POST("/teams/leave", handlers.LeaveTeam(db))
+		authorized.POST("/teams/:id/interests", handlers.AddTeamInterest(db))
+		authorized.DELETE("/teams/:id/interests/:leagueId", handlers.RemoveTeamInterest(db))
+
+		// Players
 		authorized.POST("/players", handlers.CreatePlayer(db))
 		authorized.GET("/players", handlers.GetPlayers(db))
 		authorized.GET("/players/me", handlers.GetMyPlayer(db))

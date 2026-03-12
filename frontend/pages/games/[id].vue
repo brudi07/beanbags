@@ -58,14 +58,19 @@ async function handleButtonClick() {
 }
 
 async function submitGameResults() {
+  const gameId = route.params.id as string
+
+  // Pickup games are local-only — skip backend submit
+  if (gameId === 'pickup') {
+    router.push('/')
+    return
+  }
+
   isSubmitting.value = true
   submitError.value = null
 
   try {
-    const gameId = route.params.id as string
     await scoringStore.submitGameResults(gameId)
-
-    // Navigate to game results or games list
     router.push(leagueId ? `/leagues/${leagueId}` : '/')
   } catch (error) {
     submitError.value = 'Failed to submit game results. Please try again.'
