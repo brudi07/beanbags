@@ -15,8 +15,8 @@
 ### Things to Remember:
 Don't forget to update environment variables for docker container.
 
-s := os.Getenv("JWT_SECRET")
-port := os.Getenv("SMTP_PORT")
-user := os.Getenv("SMTP_USER")
-pass := os.Getenv("SMTP_PASS")
-from := os.Getenv("SMTP_FROM")
+- s := os.Getenv("JWT_SECRET")
+- port := os.Getenv("SMTP_PORT")
+- user := os.Getenv("SMTP_USER")
+- pass := os.Getenv("SMTP_PASS")
+- from := os.Getenv("SMTP_FROM")
