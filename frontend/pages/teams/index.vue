@@ -223,6 +223,7 @@ onMounted(fetchData)
                                 <ul v-if="teamInterestSearches[team.id]?.trim()"
                                     class="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded shadow-lg max-h-40 overflow-y-auto">
                                     <li v-for="league in publicLeagues.filter(l =>
+                                            l.format === '2v2' &&
                                             l.name.toLowerCase().includes((teamInterestSearches[team.id] ?? '').toLowerCase()) &&
                                             !(teams.find(t => t.id === team.id)?.interested_leagues ?? []).some((i: any) => i.id === l.id)
                                         )" :key="league.id"
@@ -231,6 +232,7 @@ onMounted(fetchData)
                                         {{ league.name }}
                                     </li>
                                     <li v-if="!publicLeagues.filter(l =>
+                                            l.format === '2v2' &&
                                             l.name.toLowerCase().includes((teamInterestSearches[team.id] ?? '').toLowerCase()) &&
                                             !(teams.find(t => t.id === team.id)?.interested_leagues ?? []).some((i: any) => i.id === l.id)
                                         ).length"
