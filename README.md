@@ -6,6 +6,7 @@
 - ~~Error handling~~
 - ~~Toasts~~
 - ~~Confirm Modal~~
+- ~~Game persistence (in case of refresh/crash)~~
 - Forgot Password
 - Codes for teams and leagues for users to search on
 - Heatmap analytics

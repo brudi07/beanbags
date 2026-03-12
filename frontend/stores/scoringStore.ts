@@ -3,6 +3,8 @@ import type { ThrowData, RoundResult } from '~/types/game'
 import { usePlayerStore } from './playerStore'
 import { useApi } from '~/composables/useApi'
 
+const STORAGE_KEY = 'beanbags_active_game'
+
 export const useScoringStore = defineStore('scoring', {
     state: () => ({
         team1Score: 0,
@@ -25,7 +27,11 @@ export const useScoringStore = defineStore('scoring', {
 
         // Game completion
         gameWinner: null as 1 | 2 | null,
-        gameCompleted: false
+        gameCompleted: false,
+
+        // Persistence tracking
+        activeGameId: null as string | null,
+        activeLeagueId: null as string | null,
     }),
 
     getters: {
@@ -68,8 +74,89 @@ export const useScoringStore = defineStore('scoring', {
 
     actions: {
 
+        setActiveGame(gameId: string, leagueId?: string) {
+            this.activeGameId = gameId
+            this.activeLeagueId = leagueId ?? null
+            this._saveToStorage()
+        },
+
+        _saveToStorage() {
+            if (!this.activeGameId || this.activeGameId === 'pickup') return
+            const playerStore = usePlayerStore()
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                    gameId: this.activeGameId,
+                    leagueId: this.activeLeagueId,
+                    team1Score: this.team1Score,
+                    team2Score: this.team2Score,
+                    round: this.round,
+                    throws: this.throws,
+                    team1BagsRemaining: this.team1BagsRemaining,
+                    team2BagsRemaining: this.team2BagsRemaining,
+                    roundHistory: this.roundHistory,
+                    currentRoundView: this.currentRoundView,
+                    isViewingPastRound: this.isViewingPastRound,
+                    teamWithHonors: this.teamWithHonors,
+                    gameWinner: this.gameWinner,
+                    gameCompleted: this.gameCompleted,
+                    players: playerStore.players,
+                    gameFormat: playerStore.gameFormat,
+                    currentTeam1PlayerIndex: playerStore.currentTeam1PlayerIndex,
+                    currentTeam2PlayerIndex: playerStore.currentTeam2PlayerIndex,
+                }))
+            } catch {
+                // localStorage unavailable (private browsing quota, etc.) — silently continue
+            }
+        },
+
+        restoreGameState(gameId: string): boolean {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY)
+                if (!raw) return false
+                const saved = JSON.parse(raw)
+                if (saved.gameId !== gameId) return false
+
+                this.activeGameId = saved.gameId
+                this.activeLeagueId = saved.leagueId ?? null
+                this.team1Score = saved.team1Score
+                this.team2Score = saved.team2Score
+                this.round = saved.round
+                this.throws = saved.throws ?? []
+                this.team1BagsRemaining = saved.team1BagsRemaining
+                this.team2BagsRemaining = saved.team2BagsRemaining
+                this.roundHistory = saved.roundHistory ?? []
+                this.currentRoundView = saved.currentRoundView
+                this.isViewingPastRound = saved.isViewingPastRound ?? false
+                this.teamWithHonors = saved.teamWithHonors ?? null
+                this.gameWinner = saved.gameWinner ?? null
+                this.gameCompleted = saved.gameCompleted ?? false
+
+                const playerStore = usePlayerStore()
+                playerStore.players = saved.players ?? []
+                playerStore.gameFormat = saved.gameFormat ?? '2v2'
+                playerStore.currentTeam1PlayerIndex = saved.currentTeam1PlayerIndex ?? 0
+                playerStore.currentTeam2PlayerIndex = saved.currentTeam2PlayerIndex ?? 0
+                playerStore.gameStarted = true
+
+                return true
+            } catch {
+                return false
+            }
+        },
+
+        clearGameState() {
+            this.activeGameId = null
+            this.activeLeagueId = null
+            try {
+                localStorage.removeItem(STORAGE_KEY)
+            } catch {
+                // ignore
+            }
+        },
+
         addThrow(throwData: ThrowData) {
             this.throws.push(throwData)
+            this._saveToStorage()
         },
 
         resetRound() {
@@ -171,6 +258,7 @@ export const useScoringStore = defineStore('scoring', {
             }
 
             this.resetRound()
+            this._saveToStorage()
         },
 
         recalculateScores() {
@@ -261,10 +349,13 @@ export const useScoringStore = defineStore('scoring', {
                 completed_at: new Date().toISOString()
             }
 
-            return await api.fetch(`/games/${gameId}/complete`, {
+            const result = await api.fetch(`/games/${gameId}/complete`, {
                 method: 'POST',
                 body: gameData
             })
+
+            this.clearGameState()
+            return result
         }
 
     }

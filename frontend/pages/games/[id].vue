@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useScoringStore } from '~/stores/scoringStore'
 import { usePlayerStore } from '~/stores/playerStore'
@@ -79,6 +79,24 @@ async function submitGameResults() {
     isSubmitting.value = false
   }
 }
+
+onMounted(() => {
+  const gameId = route.params.id as string
+  if (gameId === 'pickup') return
+
+  if (!playerStore.gameStarted) {
+    // Page was refreshed — try to restore persisted state
+    const restored = scoringStore.restoreGameState(gameId)
+    if (!restored) {
+      // Nothing to restore and no active game — bail out
+      router.push('/leagues')
+    }
+    return
+  }
+
+  // Navigated fresh from games/new — save initial state so a refresh can recover it
+  scoringStore.setActiveGame(gameId, leagueId)
+})
 </script>
 
 <template>
