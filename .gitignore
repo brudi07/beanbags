@@ -80,3 +80,6 @@ coverage/
 
 # Generated docs
 docs/
+
+# Claude
+.claude/

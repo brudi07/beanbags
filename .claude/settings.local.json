@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(go build:*)",
-      "Bash(find /c/Users/Ben/Code/beanbags/frontend/middleware -type f -name *.ts -o -name *.js)",
-      "Bash(xargs grep:*)"
-    ]
-  }
-}
