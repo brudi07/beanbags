@@ -3,7 +3,7 @@ package handlers
 import "database/sql"
 
 // UpdateLeagueStandings updates standings after a match is completed
-func UpdateLeagueStandings(tx *sql.Tx, leagueID, team1ID, team2ID, team1Score, team2Score int) {
+func UpdateLeagueStandings(tx *sql.Tx, leagueID, team1ID, team2ID, team1Score, team2Score int) error {
 	var winner, loser int
 	var winnerScore, loserScore int
 	tie := team1Score == team2Score
@@ -17,16 +17,25 @@ func UpdateLeagueStandings(tx *sql.Tx, leagueID, team1ID, team2ID, team1Score, t
 	}
 
 	if tie {
-		updateTeamStats(tx, leagueID, team1ID, 0, 0, 1, team1Score, team2Score)
-		updateTeamStats(tx, leagueID, team2ID, 0, 0, 1, team2Score, team1Score)
+		if err := updateTeamStats(tx, leagueID, team1ID, 0, 0, 1, team1Score, team2Score); err != nil {
+			return err
+		}
+		if err := updateTeamStats(tx, leagueID, team2ID, 0, 0, 1, team2Score, team1Score); err != nil {
+			return err
+		}
 	} else {
-		updateTeamStats(tx, leagueID, winner, 1, 0, 0, winnerScore, loserScore)
-		updateTeamStats(tx, leagueID, loser, 0, 1, 0, loserScore, winnerScore)
+		if err := updateTeamStats(tx, leagueID, winner, 1, 0, 0, winnerScore, loserScore); err != nil {
+			return err
+		}
+		if err := updateTeamStats(tx, leagueID, loser, 0, 1, 0, loserScore, winnerScore); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 // updateTeamStats updates or inserts team statistics in league standings
-func updateTeamStats(tx *sql.Tx, leagueID, teamID, win, loss, tie, scored, allowed int) {
+func updateTeamStats(tx *sql.Tx, leagueID, teamID, win, loss, tie, scored, allowed int) error {
 	diff := scored - allowed
 
 	// Calculate win percentage
@@ -36,7 +45,7 @@ func updateTeamStats(tx *sql.Tx, leagueID, teamID, win, loss, tie, scored, allow
 		winPct = float64(win) / float64(totalGames) * 100
 	}
 
-	tx.Exec(`
+	_, err := tx.Exec(`
 		INSERT INTO league_standings (
 			league_id, team_id, wins, losses, ties,
 			points_for, points_against, point_diff, win_percentage
@@ -53,4 +62,5 @@ func updateTeamStats(tx *sql.Tx, leagueID, teamID, win, loss, tie, scored, allow
 		    updated_at = CURRENT_TIMESTAMP;
 	`, leagueID, teamID, win, loss, tie, scored, allowed, diff, winPct,
 		win, loss, tie, scored, allowed, diff, win, win, loss, tie)
+	return err
 }

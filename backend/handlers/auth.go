@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"database/sql"
+	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"brudi07/beanbags/models"
@@ -12,7 +14,14 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-var jwtSecret = []byte("your-secret-key-change-this-in-production") // TODO: Move to environment variable
+var jwtSecret = func() []byte {
+	s := os.Getenv("JWT_SECRET")
+	if s == "" {
+		log.Println("WARNING: JWT_SECRET env var not set, using insecure default — set it before deploying")
+		s = "dev-secret-change-in-production"
+	}
+	return []byte(s)
+}()
 
 type Claims struct {
 	UserID int `json:"user_id"`

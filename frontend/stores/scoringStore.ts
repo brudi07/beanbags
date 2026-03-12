@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import type { ThrowData, RoundResult } from '~/types/game'
 import { usePlayerStore } from './playerStore'
+import { useApi } from '~/composables/useApi'
 
 export const useScoringStore = defineStore('scoring', {
     state: () => ({
@@ -240,7 +241,7 @@ export const useScoringStore = defineStore('scoring', {
         },
 
         async submitGameResults(gameId: string) {
-            const token = localStorage.getItem('authToken')
+            const api = useApi()
 
             const gameData = {
                 winner: this.gameWinner,
@@ -260,21 +261,10 @@ export const useScoringStore = defineStore('scoring', {
                 completed_at: new Date().toISOString()
             }
 
-            const response = await fetch(`http://localhost:8080/api/games/${gameId}/complete`, {
+            return await api.fetch(`/games/${gameId}/complete`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(gameData)
+                body: gameData
             })
-
-            if (!response.ok) {
-                const err = await response.json().catch(() => ({ error: 'Unknown error' }))
-                throw new Error(err.error || 'Failed to submit game results')
-            }
-
-            return await response.json()
         }
 
     }

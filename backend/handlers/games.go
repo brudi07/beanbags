@@ -64,7 +64,10 @@ func CreateMatch(db *sql.DB) gin.HandlerFunc {
 		}
 
 		matchID, _ := result.LastInsertId()
-		db.Exec(`UPDATE league_games SET game_id = ?, status = 'in_progress' WHERE id = ?`, matchID, *req.LeagueGameID)
+		if _, err := db.Exec(`UPDATE league_games SET game_id = ?, status = 'in_progress' WHERE id = ?`, matchID, *req.LeagueGameID); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update league game status"})
+			return
+		}
 
 		c.JSON(http.StatusCreated, gin.H{"id": matchID})
 	}
@@ -240,7 +243,10 @@ func CompleteGame(db *sql.DB) gin.HandlerFunc {
 		`, matchID).Scan(&leagueID, &team1ID, &team2ID)
 
 		if err == nil && leagueID != nil {
-			UpdateLeagueStandings(tx, *leagueID, team1ID, team2ID, req.FinalScore.Team1, req.FinalScore.Team2)
+			if standingsErr := UpdateLeagueStandings(tx, *leagueID, team1ID, team2ID, req.FinalScore.Team1, req.FinalScore.Team2); standingsErr != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update league standings"})
+				return
+			}
 		}
 
 		if err := tx.Commit(); err != nil {
