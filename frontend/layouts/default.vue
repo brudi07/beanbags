@@ -67,5 +67,8 @@ function handleLogin() {
       <slot />
     </main>
 
+    <ToastContainer />
+    <ConfirmModal />
+
   </div>
 </template>

@@ -3,11 +3,13 @@ import { computed, ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { usePlayerStore } from '~/stores/playerStore'
 import { useApi } from '~/composables/useApi'
+import { useToast } from '~/composables/useToast'
 import type { GameFormat } from '~/types/game'
 
 const router = useRouter()
 const route = useRoute()
 const api = useApi()
+const toast = useToast()
 const playerStore = usePlayerStore()
 
 const leagueId = route.query.leagueId as string | undefined
@@ -86,7 +88,7 @@ async function startGame() {
 
     router.push(`/games/${game.id}?leagueId=${leagueId}`)
   } catch (err: any) {
-    alert(err.data?.error || err.message)
+    toast.error(err.data?.error || err.message)
   }
 }
 

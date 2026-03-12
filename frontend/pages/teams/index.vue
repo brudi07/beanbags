@@ -2,9 +2,13 @@
 import { ref, computed, onMounted } from 'vue'
 import { useApi } from '~/composables/useApi'
 import { useAuth } from '~/composables/useAuth'
+import { useToast } from '~/composables/useToast'
+import { useConfirm } from '~/composables/useConfirm'
 
 const api = useApi()
 const auth = useAuth()
+const toast = useToast()
+const confirm = useConfirm().confirm
 
 const myPlayer = ref<any>(null)
 const teams = ref<any[]>([])
@@ -60,7 +64,7 @@ async function createTeam() {
         showCreateForm.value = false
         await fetchData()
     } catch (err: any) {
-        alert(err.data?.error || err.message)
+        toast.error(err.data?.error || err.message)
     }
 }
 
@@ -69,12 +73,12 @@ async function joinTeam(teamId: number) {
         await api.fetch(`/teams/${teamId}/join`, { method: 'POST' })
         await fetchData()
     } catch (err: any) {
-        alert(err.data?.error || err.message)
+        toast.error(err.data?.error || err.message)
     }
 }
 
 async function leaveTeam(teamId: number) {
-    if (!confirm('Are you sure you want to leave this team?')) return
+    if (!await confirm('Are you sure you want to leave this team?')) return
     try {
         await api.fetch('/teams/leave', {
             method: 'POST',
@@ -82,7 +86,7 @@ async function leaveTeam(teamId: number) {
         })
         await fetchData()
     } catch (err: any) {
-        alert(err.data?.error || err.message)
+        toast.error(err.data?.error || err.message)
     }
 }
 
@@ -95,7 +99,7 @@ async function addInterest(teamId: number, leagueId: number) {
         teamInterestSearches.value[teamId] = ''
         await fetchData()
     } catch (err: any) {
-        alert(err.data?.error || err.message)
+        toast.error(err.data?.error || err.message)
     }
 }
 
@@ -104,7 +108,7 @@ async function removeInterest(teamId: number, leagueId: number) {
         await api.fetch(`/teams/${teamId}/interests/${leagueId}`, { method: 'DELETE' })
         await fetchData()
     } catch (err: any) {
-        alert(err.data?.error || err.message)
+        toast.error(err.data?.error || err.message)
     }
 }
 

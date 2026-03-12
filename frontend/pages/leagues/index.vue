@@ -3,11 +3,15 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useApi } from '~/composables/useApi';
 import { useAuth } from '~/composables/useAuth'
+import { useToast } from '~/composables/useToast'
+import { useConfirm } from '~/composables/useConfirm'
 import type { League } from '~/types/league'
 
 const router = useRouter()
 const auth = useAuth()
 const api = useApi()
+const toast = useToast()
+const confirm = useConfirm().confirm
 
 const publicLeagues = ref<League[]>([])
 const myLeagues = ref<League[]>([])
@@ -103,12 +107,12 @@ async function joinLeague(leagueId: number) {
         await Promise.all([fetchPublicLeagues(), fetchMyLeagues()])
         router.push(`/leagues/${leagueId}`)
     } catch (err: any) {
-        alert(err.data?.error || err.message || 'Failed to join league')
+        toast.error(err.data?.error || err.message || 'Failed to join league')
     }
 }
 
 async function leaveLeague(leagueId: number) {
-    if (!confirm('Are you sure you want to leave this league?')) return
+    if (!await confirm('Are you sure you want to leave this league?')) return
 
     try {
         await api.fetch(`/leagues/${leagueId}/leave`, {
@@ -117,7 +121,7 @@ async function leaveLeague(leagueId: number) {
 
         await Promise.all([fetchPublicLeagues(), fetchMyLeagues()])
     } catch (err: any) {
-        alert(err.data?.error || err.message || 'Failed to leave league')
+        toast.error(err.data?.error || err.message || 'Failed to leave league')
     }
 }
 

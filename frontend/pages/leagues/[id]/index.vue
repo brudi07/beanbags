@@ -3,12 +3,16 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useApi } from '~/composables/useApi'
 import { useAuth } from '~/composables/useAuth'
+import { useToast } from '~/composables/useToast'
+import { useConfirm } from '~/composables/useConfirm'
 import type { League, LeagueSchedule, LeagueGame } from '~/types/league'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuth()
 const api = useApi()
+const toast = useToast()
+const confirm = useConfirm().confirm
 
 const leagueId = route.params.id as string
 
@@ -129,7 +133,7 @@ async function fetchLeagueData() {
 
 async function startGame(game: LeagueGame) {
     if (!canStartGame(game)) {
-        alert('You are not a player in this game')
+        toast.error('You are not a player in this game')
         return
     }
 
@@ -190,7 +194,7 @@ async function confirmReschedule() {
         closeReschedule()
         await fetchLeagueData()
     } catch (err: any) {
-        alert(err.data?.error || err.message)
+        toast.error(err.data?.error || err.message)
     }
 }
 
@@ -203,12 +207,12 @@ async function joinLeague(teamId?: number) {
         showJoinPanel.value = false
         await fetchLeagueData()
     } catch (err: any) {
-        alert(err.data?.error || err.message)
+        toast.error(err.data?.error || err.message)
     }
 }
 
 async function leaveLeague() {
-    if (!confirm('Are you sure you want to leave this league?')) return
+    if (!await confirm('Are you sure you want to leave this league?')) return
 
     try {
         // ✅ No Response cast needed
@@ -218,7 +222,7 @@ async function leaveLeague() {
 
         router.push('/leagues')
     } catch (err: any) {
-        alert(err.data?.error || err.message)
+        toast.error(err.data?.error || err.message)
     }
 }
 
@@ -227,7 +231,10 @@ function editLeague() {
 }
 
 async function scheduleGames() {
-    if (!confirm('Generate the league schedule? This cannot be undone.')) {
+    if (!await confirm('Generate the league schedule? This cannot be undone.', {
+        title: 'Generate Schedule',
+        confirmLabel: 'Generate',
+    })) {
         return
     }
 
@@ -240,13 +247,11 @@ async function scheduleGames() {
             method: 'POST'
         })
 
-        alert(`Schedule created!
-            Matches: ${result.total_matches}
-            Games: ${result.total_games}`)
+        toast.success(`Schedule created! ${result.total_matches} matches, ${result.total_games} games`)
 
         await fetchLeagueData()
     } catch (err: any) {
-        alert(err.data?.error || err.message)
+        toast.error(err.data?.error || err.message)
     }
 }
 
