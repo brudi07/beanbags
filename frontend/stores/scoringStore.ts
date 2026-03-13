@@ -75,6 +75,20 @@ export const useScoringStore = defineStore('scoring', {
     actions: {
 
         setActiveGame(gameId: string, leagueId?: string) {
+            // Reset all scoring state for a fresh game
+            this.team1Score = 0
+            this.team2Score = 0
+            this.round = 1
+            this.throws = []
+            this.team1BagsRemaining = 4
+            this.team2BagsRemaining = 4
+            this.roundHistory = []
+            this.currentRoundView = 1
+            this.isViewingPastRound = false
+            this.teamWithHonors = null
+            this.gameWinner = null
+            this.gameCompleted = false
+            // Set new game context
             this.activeGameId = gameId
             this.activeLeagueId = leagueId ?? null
             this._saveToStorage()
