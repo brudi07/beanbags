@@ -37,6 +37,11 @@ const canStartGame = computed(() => {
   }
 })
 
+const playerDbIds = ref<{ team1: (number | undefined)[], team2: (number | undefined)[] }>({
+  team1: [],
+  team2: []
+})
+
 function loadLeagueGamePlayers() {
   if (!leagueId || !leagueGameId) return
 
@@ -53,6 +58,12 @@ function loadLeagueGamePlayers() {
   team1Player2.value = t1p2
   team2Player1.value = t2p1
   team2Player2.value = t2p2
+
+  const parseId = (val: string | undefined) => val ? parseInt(val) || undefined : undefined
+  playerDbIds.value = {
+    team1: [parseId(route.query.t1p1id as string), parseId(route.query.t1p2id as string)],
+    team2: [parseId(route.query.t2p1id as string), parseId(route.query.t2p2id as string)]
+  }
 }
 
 async function startGame() {
@@ -67,7 +78,7 @@ async function startGame() {
         : [team2Player1.value.trim(), team2Player2.value.trim()]
   }
 
-  playerStore.setupGame(gameFormat.value, playerNames)
+  playerStore.setupGame(gameFormat.value, playerNames, isLeagueGame ? playerDbIds.value : undefined)
 
   // Pickup games are local-only — no backend storage
   if (!isLeagueGame) {

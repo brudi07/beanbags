@@ -60,6 +60,11 @@ onMounted(async () => {
                     <p class="text-sm text-gray-500 mb-1">Points Contributed</p>
                     <p class="text-3xl font-bold text-blue-600">{{ stats.points_contributed }}</p>
                 </div>
+                <div class="border rounded-xl p-6 bg-yellow-50 shadow-sm">
+                    <p class="text-sm text-gray-500 mb-1">4-Bagger</p>
+                    <p class="text-3xl font-bold text-yellow-600">{{ stats.four_bagger }}</p>
+                    <p class="text-xs text-gray-400 mt-1">All 4 bags in one round</p>
+                </div>
             </div>
 
             <div class="grid gap-4 sm:grid-cols-3">

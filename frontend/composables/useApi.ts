@@ -2,7 +2,8 @@ import { useRouter } from 'vue-router'
 import { useAuth } from '~/composables/useAuth'
 
 export const useApi = () => {
-    const baseURL = 'http://localhost:8080/api'
+    const config = useRuntimeConfig()
+    const baseURL = config.public.apiBase as string
     const router = useRouter()
     const auth = useAuth()
 

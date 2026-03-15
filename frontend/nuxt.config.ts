@@ -6,6 +6,12 @@ export default defineNuxtConfig({
     '@nuxtjs/tailwindcss',
   ],
 
+  runtimeConfig: {
+    public: {
+      apiBase: 'http://localhost:8080/api'
+    }
+  },
+
   // Use this instead of a separate postcss.config.cjs
   postcss: {
     plugins: {

@@ -43,7 +43,8 @@ const playerStats = computed(() => {
                 accuracy: 0,
                 pointsPerRound: 0,
                 differentialPerRound: 0,
-                busts: 0
+                busts: 0,
+                fourInTheHole: 0
             }
         }
     })
@@ -120,9 +121,14 @@ const isCurrentTurn = (playerId: string) => {
                     <div class="font-bold text-gray-600">{{ stats.itos }}</div>
                 </div>
 
-                <div class="bg-gray-50 rounded-lg p-2 col-span-2">
+                <div class="bg-gray-50 rounded-lg p-2">
                     <div class="text-gray-500 text-xs">Busts</div>
                     <div class="font-bold text-red-600 text-lg">{{ stats.busts }}</div>
+                </div>
+
+                <div class="bg-yellow-50 rounded-lg p-2">
+                    <div class="text-gray-500 text-xs">4-Bagger</div>
+                    <div class="font-bold text-yellow-600 text-lg">{{ stats.fourBagger }}</div>
                 </div>
 
             </div>

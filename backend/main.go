@@ -3,6 +3,8 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
+	"strings"
 
 	"brudi07/beanbags/database"
 	"brudi07/beanbags/handlers"
@@ -24,8 +26,18 @@ func main() {
 	r := gin.Default()
 
 	// CORS configuration for frontend
+	allowedOrigins := []string{"http://localhost:3000", "http://localhost:5173"}
+	if appURL := os.Getenv("APP_URL"); appURL != "" {
+		// Support comma-separated list of origins in APP_URL
+		for _, u := range strings.Split(appURL, ",") {
+			u = strings.TrimSpace(u)
+			if u != "" {
+				allowedOrigins = append(allowedOrigins, u)
+			}
+		}
+	}
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000", "http://localhost:5173"}, // Add your frontend URLs
+		AllowOrigins:     allowedOrigins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},

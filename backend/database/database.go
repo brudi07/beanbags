@@ -283,5 +283,14 @@ func runSchema(db *sql.DB) error {
 		}
 	}
 
+	// Run additive migrations (errors ignored — column may already exist)
+	migrations := []string{
+		`ALTER TABLE league_standings ADD COLUMN player_id INTEGER REFERENCES players(id) ON DELETE CASCADE`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_league_standings_player ON league_standings(league_id, player_id) WHERE player_id IS NOT NULL`,
+	}
+	for _, m := range migrations {
+		db.Exec(m)
+	}
+
 	return nil
 }

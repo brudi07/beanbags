@@ -344,6 +344,7 @@ export const useScoringStore = defineStore('scoring', {
 
         async submitGameResults(gameId: string) {
             const api = useApi()
+            const playerStore = usePlayerStore()
 
             const gameData = {
                 winner: this.gameWinner,
@@ -352,14 +353,32 @@ export const useScoringStore = defineStore('scoring', {
                     team2: this.team2Score
                 },
                 total_rounds: this.round - 1,
-                round_history: this.roundHistory.map(r => ({
-                    round: r.round,
-                    throws: [],
-                    team1_points: r.team1Points,
-                    team2_points: r.team2Points,
-                    team1_busted: r.team1Busted ?? false,
-                    team2_busted: r.team2Busted ?? false,
-                })),
+                round_history: this.roundHistory.map(r => {
+                    const playerThrowCount = new Map<string, number>()
+                    return {
+                        round: r.round,
+                        throws: r.throws.map(t => {
+                            const count = (playerThrowCount.get(t.playerId) || 0) + 1
+                            playerThrowCount.set(t.playerId, count)
+                            const player = playerStore.players.find(p => p.id === t.playerId)
+                            const pointsEarned = t.result === 'hole' ? 3 : t.result === 'board' ? 1 : 0
+                            return {
+                                player_id: player?.dbId ?? 0,
+                                team: t.team,
+                                throw_number: count,
+                                result: t.result,
+                                x_position: t.x,
+                                y_position: t.y,
+                                rotation: t.rotation,
+                                points_earned: pointsEarned,
+                            }
+                        }),
+                        team1_points: r.team1Points,
+                        team2_points: r.team2Points,
+                        team1_busted: r.team1Busted ?? false,
+                        team2_busted: r.team2Busted ?? false,
+                    }
+                }),
                 completed_at: new Date().toISOString()
             }
 

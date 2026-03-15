@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"database/sql"
+	"fmt"
 	"net/http"
+	"strings"
 
 	"brudi07/beanbags/models"
 
@@ -188,13 +190,27 @@ func GetMyStats(db *sql.DB) gin.HandlerFunc {
 			c.JSON(http.StatusOK, gin.H{
 				"total_throws": 0, "holes": 0, "boards": 0,
 				"misses": 0, "itos": 0, "points_contributed": 0, "accuracy": 0.0,
+				"four_bagger": 0,
 			})
 			return
 		}
 
+		// Count rounds where the player sank all 4 bags
+		var fourBagger int
+		db.QueryRow(`
+			SELECT COUNT(*) FROM (
+				SELECT t.round_id
+				FROM throws t
+				JOIN players p ON t.player_id = p.id
+				WHERE p.user_id = ?
+				GROUP BY t.round_id, t.player_id
+				HAVING COUNT(*) = 4 AND SUM(CASE WHEN t.result = 'hole' THEN 1 ELSE 0 END) = 4
+			)
+		`, userID).Scan(&fourBagger)
+
 		accuracy := 0.0
-		if totalThrows > 0 {
-			accuracy = float64(holes+boards) / float64(totalThrows) * 100
+		if attempts := totalThrows - itos; attempts > 0 {
+			accuracy = float64(holes+boards) / float64(attempts) * 100
 		}
 
 		c.JSON(http.StatusOK, gin.H{
@@ -205,6 +221,7 @@ func GetMyStats(db *sql.DB) gin.HandlerFunc {
 			"itos":               itos,
 			"points_contributed": pointsContributed,
 			"accuracy":           accuracy,
+			"four_bagger":        fourBagger,
 		})
 	}
 }
@@ -222,48 +239,165 @@ func GetMyGames(db *sql.DB) gin.HandlerFunc {
 		rows, err := db.Query(`
 			SELECT
 				m.id, m.start_time,
-				t1.name as team1_name,
-				t2.name as team2_name,
-				tw.name as winning_team_name,
-				CASE WHEN EXISTS (
-					SELECT 1 FROM players p WHERE p.team_id = m.team1_id AND p.user_id = ?
-				) THEN 1 ELSE 2 END as user_team
+				COALESCE(t1.name, lg.team1, 'Team 1') as team1_name,
+				COALESCE(t2.name, lg.team2, 'Team 2') as team2_name,
+				COALESCE(
+					tw.name,
+					CASE
+						WHEN lg.winning_team = 1 THEN COALESCE(t1.name, lg.team1)
+						WHEN lg.winning_team = 2 THEN COALESCE(t2.name, lg.team2)
+						ELSE NULL
+					END
+				) as winning_team_name,
+				CASE
+					WHEN m.team1_id IS NOT NULL AND EXISTS (
+						SELECT 1 FROM team_members tm JOIN players p ON tm.player_id = p.id
+						WHERE tm.team_id = m.team1_id AND p.user_id = ?
+					) THEN 1
+					WHEN m.team1_id IS NULL AND EXISTS (
+						SELECT 1 FROM throws t JOIN rounds r ON t.round_id = r.id
+						JOIN players p ON t.player_id = p.id
+						WHERE r.match_id = m.id AND t.team = 1 AND p.user_id = ?
+					) THEN 1
+					ELSE 2
+				END as user_team,
+				COALESCE(lg.team1_score, 0) as team1_score,
+				COALESCE(lg.team2_score, 0) as team2_score
 			FROM matches m
-			JOIN teams t1 ON m.team1_id = t1.id
-			JOIN teams t2 ON m.team2_id = t2.id
+			LEFT JOIN teams t1 ON m.team1_id = t1.id
+			LEFT JOIN teams t2 ON m.team2_id = t2.id
 			LEFT JOIN teams tw ON m.winning_team_id = tw.id
+			LEFT JOIN league_games lg ON lg.game_id = m.id
 			WHERE m.status = 'completed'
 			AND (
-				EXISTS (SELECT 1 FROM players p WHERE p.team_id = m.team1_id AND p.user_id = ?)
-				OR EXISTS (SELECT 1 FROM players p WHERE p.team_id = m.team2_id AND p.user_id = ?)
+				EXISTS (
+					SELECT 1 FROM team_members tm JOIN players p ON tm.player_id = p.id
+					WHERE tm.team_id = m.team1_id AND p.user_id = ?
+				)
+				OR EXISTS (
+					SELECT 1 FROM team_members tm JOIN players p ON tm.player_id = p.id
+					WHERE tm.team_id = m.team2_id AND p.user_id = ?
+				)
+				OR EXISTS (
+					SELECT 1 FROM throws t JOIN rounds r ON t.round_id = r.id
+					JOIN players p ON t.player_id = p.id
+					WHERE r.match_id = m.id AND p.user_id = ?
+				)
 			)
 			ORDER BY m.start_time DESC
 			LIMIT 50
-		`, userID, userID, userID)
+		`, userID, userID, userID, userID, userID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch game history"})
 			return
 		}
 		defer rows.Close()
 
-		type GameEntry struct {
-			ID       int     `json:"id"`
-			Date     string  `json:"date"`
-			Team1    string  `json:"team1"`
-			Team2    string  `json:"team2"`
-			Winner   *string `json:"winner"`
-			UserTeam int     `json:"user_team"`
+		type PlayerStat struct {
+			PlayerID      int    `json:"player_id"`
+			PlayerName    string `json:"player_name"`
+			Team          int    `json:"team"`
+			Holes         int    `json:"holes"`
+			Boards        int    `json:"boards"`
+			Misses        int    `json:"misses"`
+			Itos          int    `json:"itos"`
+			FourBagger     int    `json:"four_bagger"`
+			IsMe          bool   `json:"is_me"`
 		}
 
-		games := []GameEntry{}
+		type GameEntry struct {
+			ID          int          `json:"id"`
+			Date        string       `json:"date"`
+			Team1       string       `json:"team1"`
+			Team2       string       `json:"team2"`
+			Winner      *string      `json:"winner"`
+			UserTeam    int          `json:"user_team"`
+			Team1Score  int          `json:"team1_score"`
+			Team2Score  int          `json:"team2_score"`
+			PlayerStats []PlayerStat `json:"player_stats"`
+		}
+
+		gamesMap := map[int]*GameEntry{}
+		var orderedIDs []int
+
 		for rows.Next() {
 			var g GameEntry
 			var winner sql.NullString
-			if err := rows.Scan(&g.ID, &g.Date, &g.Team1, &g.Team2, &winner, &g.UserTeam); err == nil {
+			if err := rows.Scan(
+				&g.ID, &g.Date, &g.Team1, &g.Team2, &winner, &g.UserTeam,
+				&g.Team1Score, &g.Team2Score,
+			); err == nil {
 				if winner.Valid {
 					g.Winner = &winner.String
 				}
-				games = append(games, g)
+				g.PlayerStats = []PlayerStat{}
+				gamesMap[g.ID] = &g
+				orderedIDs = append(orderedIDs, g.ID)
+			}
+		}
+		rows.Close()
+
+		if len(orderedIDs) > 0 {
+			placeholders := strings.Repeat("?,", len(orderedIDs))
+			placeholders = placeholders[:len(placeholders)-1]
+
+			statsArgs := []interface{}{userID}
+			for _, id := range orderedIDs {
+				statsArgs = append(statsArgs, id)
+			}
+
+			statsRows, err := db.Query(fmt.Sprintf(`
+				SELECT
+					r.match_id,
+					p.id,
+					p.name,
+					th.team,
+					COALESCE(SUM(CASE WHEN th.result = 'hole' THEN 1 ELSE 0 END), 0),
+					COALESCE(SUM(CASE WHEN th.result = 'board' THEN 1 ELSE 0 END), 0),
+					COALESCE(SUM(CASE WHEN th.result = 'miss' THEN 1 ELSE 0 END), 0),
+					COALESCE(SUM(CASE WHEN th.result = 'ito' THEN 1 ELSE 0 END), 0),
+					(
+						SELECT COUNT(*) FROM (
+							SELECT t2.round_id
+							FROM throws t2
+							WHERE t2.player_id = p.id
+							AND t2.round_id IN (SELECT id FROM rounds WHERE match_id = r.match_id)
+							GROUP BY t2.round_id
+							HAVING COUNT(*) = 4 AND SUM(CASE WHEN t2.result = 'hole' THEN 1 ELSE 0 END) = 4
+						)
+					) as four_bagger,
+					CASE WHEN p.user_id = ? THEN 1 ELSE 0 END
+				FROM throws th
+				JOIN rounds r ON th.round_id = r.id
+				JOIN players p ON th.player_id = p.id
+				WHERE r.match_id IN (%s)
+				GROUP BY r.match_id, p.id, th.team
+				ORDER BY r.match_id, th.team, p.id
+			`, placeholders), statsArgs...)
+
+			if err == nil {
+				defer statsRows.Close()
+				for statsRows.Next() {
+					var matchID int
+					var ps PlayerStat
+					var isMe int
+					if statsRows.Scan(
+						&matchID, &ps.PlayerID, &ps.PlayerName, &ps.Team,
+						&ps.Holes, &ps.Boards, &ps.Misses, &ps.Itos, &ps.FourBagger, &isMe,
+					) == nil {
+						ps.IsMe = isMe == 1
+						if g, ok := gamesMap[matchID]; ok {
+							g.PlayerStats = append(g.PlayerStats, ps)
+						}
+					}
+				}
+			}
+		}
+
+		games := make([]GameEntry, 0, len(orderedIDs))
+		for _, id := range orderedIDs {
+			if g, ok := gamesMap[id]; ok {
+				games = append(games, *g)
 			}
 		}
 

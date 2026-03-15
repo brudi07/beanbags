@@ -11,6 +11,7 @@ export interface Player {
     id: string
     name: string
     team: 1 | 2
+    dbId?: number // actual DB player ID for league games
 }
 
 export interface PlayerStats {
@@ -25,6 +26,7 @@ export interface PlayerStats {
     pointsPerRound: number // average points contributed per round
     differentialPerRound: number // average differential impact per round
     busts: number // number of times player caused their team to bust
+    fourBagger: number // number of rounds where all 4 bags went in the hole
 }
 
 export interface ThrowData {

@@ -35,7 +35,11 @@ export const usePlayerStore = defineStore('player', {
     },
 
     actions: {
-        setupGame(format: GameFormat, playerNames: { team1: string[], team2: string[] }) {
+        setupGame(
+            format: GameFormat,
+            playerNames: { team1: string[], team2: string[] },
+            playerDbIds?: { team1: (number | undefined)[], team2: (number | undefined)[] }
+        ) {
             this.gameFormat = format
             this.players = []
 
@@ -44,7 +48,8 @@ export const usePlayerStore = defineStore('player', {
                 this.players.push({
                     id: `team1-player${index + 1}`,
                     name,
-                    team: 1
+                    team: 1,
+                    dbId: playerDbIds?.team1[index]
                 })
             })
 
@@ -53,7 +58,8 @@ export const usePlayerStore = defineStore('player', {
                 this.players.push({
                     id: `team2-player${index + 1}`,
                     name,
-                    team: 2
+                    team: 2,
+                    dbId: playerDbIds?.team2[index]
                 })
             })
 
@@ -116,7 +122,8 @@ export const usePlayerStore = defineStore('player', {
                     accuracy: 0,
                     pointsPerRound: 0,
                     differentialPerRound: 0,
-                    busts: 0
+                    busts: 0,
+                    fourBagger: 0
                 })
             })
 
@@ -212,6 +219,20 @@ export const usePlayerStore = defineStore('player', {
                             if (stats) stats.busts++
                         })
                     }
+
+                    // Detect 4-in-the-hole: all 4 of a player's throws in this round are holes
+                    const roundThrowsByPlayer = new Map<string, string[]>()
+                    round.throws.forEach((throwData: any) => {
+                        const results = roundThrowsByPlayer.get(throwData.playerId) || []
+                        results.push(throwData.result)
+                        roundThrowsByPlayer.set(throwData.playerId, results)
+                    })
+                    roundThrowsByPlayer.forEach((results, playerId) => {
+                        if (results.length === 4 && results.every(r => r === 'hole')) {
+                            const stats = statsMap.get(playerId)
+                            if (stats) stats.fourBagger++
+                        }
+                    })
 
                     // Add round points to each player's round array
                     this.players.forEach(player => {

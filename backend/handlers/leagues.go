@@ -498,11 +498,14 @@ func GetLeagueStandings(db *sql.DB) gin.HandlerFunc {
 
 		rows, err := db.Query(`
 			SELECT
-				ls.league_id, ls.team_id, t.name as team_name,
+				ls.league_id,
+				COALESCE(ls.team_id, 0) as team_id,
+				COALESCE(t.name, p.name, 'Unknown') as team_name,
 				ls.wins, ls.losses, ls.ties, ls.points_for, ls.points_against,
 				ls.point_diff, ls.win_percentage
 			FROM league_standings ls
-			JOIN teams t ON ls.team_id = t.id
+			LEFT JOIN teams t ON ls.team_id = t.id
+			LEFT JOIN players p ON ls.player_id = p.id
 			WHERE ls.league_id = ?
 			ORDER BY ls.win_percentage DESC, ls.point_diff DESC
 		`, leagueID)

@@ -59,12 +59,25 @@ const memberTeams = computed(() => {
     return Object.values(teams)
 })
 
+function isGameToday(game: LeagueGame): boolean {
+    const today = new Date().toISOString().split('T')[0]!
+    return game.scheduled_date <= today
+}
+
 function canStartGame(game: LeagueGame): boolean {
     if (!auth.currentUser.value) return false
 
-    // Check if current user is one of the players in this game
-    return game.team1_player_ids.includes(auth.currentUser.value.id) ||
+    // Completed/in-progress games can always be viewed/continued regardless of date
+    if (game.status !== 'scheduled') {
+        return game.team1_player_ids.includes(auth.currentUser.value.id) ||
+            game.team2_player_ids.includes(auth.currentUser.value.id)
+    }
+
+    // Scheduled games can only be started on or after the scheduled date
+    return isGameToday(game) && (
+        game.team1_player_ids.includes(auth.currentUser.value.id) ||
         game.team2_player_ids.includes(auth.currentUser.value.id)
+    )
 }
 
 function previousDate() {
@@ -161,9 +174,13 @@ async function startGame(game: LeagueGame) {
             bestOf: String(league.value!.games_per_match),
             t1p1: team1Names[0] || '',
             t2p1: team2Names[0] || '',
+            t1p1id: String(game.team1_player_ids[0] || ''),
+            t2p1id: String(game.team2_player_ids[0] || ''),
         })
         if (team1Names[1]) params.set('t1p2', team1Names[1])
         if (team2Names[1]) params.set('t2p2', team2Names[1])
+        if (game.team1_player_ids[1]) params.set('t1p2id', String(game.team1_player_ids[1]))
+        if (game.team2_player_ids[1]) params.set('t2p2id', String(game.team2_player_ids[1]))
         router.push(`/games/new?${params.toString()}`)
     }
 }
@@ -185,13 +202,46 @@ async function confirmReschedule() {
     if (!rescheduleGameId.value || !newScheduledDate.value) return
 
     try {
-        // ✅ No Response cast, no .ok check, no .json()
         await api.fetch(`/leagues/${leagueId}/games/${rescheduleGameId.value}/reschedule`, {
             method: 'PATCH',
-            body: { scheduledDate: newScheduledDate.value }
+            body: { scheduled_date: newScheduledDate.value }
         })
 
         closeReschedule()
+        await fetchLeagueData()
+    } catch (err: any) {
+        toast.error(err.data?.error || err.message)
+    }
+}
+
+const rescheduleAllOpen = ref(false)
+const rescheduleAllDate = ref('')
+
+function openRescheduleAll() {
+    rescheduleAllDate.value = selectedDate.value || ''
+    rescheduleAllOpen.value = true
+}
+
+function closeRescheduleAll() {
+    rescheduleAllOpen.value = false
+    rescheduleAllDate.value = ''
+}
+
+async function confirmRescheduleAll() {
+    if (!rescheduleAllDate.value || !selectedDate.value) return
+
+    const scheduledGames = gamesForSelectedDate.value.filter(g => g.status === 'scheduled')
+    if (scheduledGames.length === 0) return
+
+    try {
+        await Promise.all(scheduledGames.map(game =>
+            api.fetch(`/leagues/${leagueId}/games/${game.id}/reschedule`, {
+                method: 'PATCH',
+                body: { scheduled_date: rescheduleAllDate.value }
+            })
+        ))
+
+        closeRescheduleAll()
         await fetchLeagueData()
     } catch (err: any) {
         toast.error(err.data?.error || err.message)
@@ -474,6 +524,15 @@ onMounted(() => {
                                     Jump to Today
                                 </button>
                             </div>
+
+                            <!-- Reschedule All -->
+                            <div v-if="isOrganizer && gamesForSelectedDate.some(g => g.status === 'scheduled')"
+                                class="text-center mt-1">
+                                <button @click="openRescheduleAll"
+                                    class="text-sm text-orange-600 hover:text-orange-700 font-medium">
+                                    Reschedule All Games This Day
+                                </button>
+                            </div>
                         </div>
 
                         <!-- Games for Selected Date -->
@@ -530,25 +589,21 @@ onMounted(() => {
                                             Reschedule
                                         </button>
 
-                                        <!-- Player: Start/View Game -->
-                                        <button v-if="canStartGame(game)" @click="startGame(game)"
-                                            class="px-4 py-2 rounded-lg font-semibold text-white transition-colors"
-                                            :class="{
-                                                'bg-green-600 hover:bg-green-700': game.status === 'scheduled',
-                                                'bg-yellow-600 hover:bg-yellow-700': game.status === 'in_progress',
-                                                'bg-blue-600 hover:bg-blue-700': game.status === 'completed'
-                                            }">
-                                            {{ game.status === 'completed' ? 'View Game' : game.status === 'in_progress'
-                                                ?
-                                                'Continue' : 'Start Game' }}
-                                        </button>
-
-                                        <!-- Non-player: View only if completed -->
-                                        <button v-else-if="game.status === 'completed'"
-                                            @click="router.push(`/games/${game.game_id}`)"
-                                            class="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700">
-                                            View Game
-                                        </button>
+                                        <!-- Player: Start/Continue Game -->
+                                        <template v-if="auth.currentUser.value && (game.team1_player_ids.includes(auth.currentUser.value.id) || game.team2_player_ids.includes(auth.currentUser.value.id))">
+                                            <button v-if="canStartGame(game)" @click="startGame(game)"
+                                                class="px-4 py-2 rounded-lg font-semibold text-white transition-colors"
+                                                :class="{
+                                                    'bg-green-600 hover:bg-green-700': game.status === 'scheduled',
+                                                    'bg-yellow-600 hover:bg-yellow-700': game.status === 'in_progress',
+                                                }">
+                                                {{ game.status === 'in_progress' ? 'Continue' : 'Start Game' }}
+                                            </button>
+                                            <span v-else-if="game.status === 'scheduled'"
+                                                class="px-4 py-2 rounded-lg font-semibold text-gray-400 bg-gray-100 cursor-not-allowed">
+                                                Upcoming
+                                            </span>
+                                        </template>
                                     </div>
 
                                 </div>
@@ -666,6 +721,36 @@ onMounted(() => {
                     class="mt-4 w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300">
                     Cancel
                 </button>
+            </div>
+        </div>
+
+        <!-- Reschedule All Modal -->
+        <div v-if="rescheduleAllOpen" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+            @click.self="closeRescheduleAll">
+            <div class="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4">
+                <h3 class="text-xl font-bold text-gray-900 mb-2">Reschedule All Games</h3>
+                <p class="text-sm text-gray-500 mb-4">
+                    Moves all {{ gamesForSelectedDate.filter(g => g.status === 'scheduled').length }} scheduled game(s) from this day to a new date.
+                </p>
+
+                <div class="mb-6">
+                    <label for="newDateAll" class="block text-sm font-semibold text-gray-700 mb-2">
+                        New Date
+                    </label>
+                    <input id="newDateAll" v-model="rescheduleAllDate" type="date"
+                        class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+
+                <div class="flex gap-3">
+                    <button @click="confirmRescheduleAll"
+                        class="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700">
+                        Reschedule All
+                    </button>
+                    <button @click="closeRescheduleAll"
+                        class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300">
+                        Cancel
+                    </button>
+                </div>
             </div>
         </div>
 

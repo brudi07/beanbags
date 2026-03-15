@@ -72,8 +72,8 @@ async function submitGameResults() {
   try {
     await scoringStore.submitGameResults(gameId)
     router.push(leagueId ? `/leagues/${leagueId}` : '/')
-  } catch (error) {
-    submitError.value = 'Failed to submit game results. Please try again.'
+  } catch (error: any) {
+    submitError.value = error?.data?.error || error?.message || 'Failed to submit game results. Please try again.'
     console.error('Submit error:', error)
   } finally {
     isSubmitting.value = false

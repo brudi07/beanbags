@@ -183,12 +183,29 @@ func CompleteGame(db *sql.DB) gin.HandlerFunc {
 		}
 		defer tx.Rollback()
 
+		// Fetch actual team IDs to resolve the winning team FK
+		var leagueID sql.NullInt64
+		var team1ID, team2ID sql.NullInt64
+		if err = tx.QueryRow(`
+			SELECT league_id, team1_id, team2_id FROM matches WHERE id = ?
+		`, matchID).Scan(&leagueID, &team1ID, &team2ID); err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Match not found"})
+			return
+		}
+
+		var winningTeamID sql.NullInt64
+		if req.Winner == 2 {
+			winningTeamID = team2ID
+		} else {
+			winningTeamID = team1ID
+		}
+
 		// Update match
 		_, err = tx.Exec(`
 			UPDATE matches
 			SET winning_team_id = ?, end_time = ?, status = 'completed'
 			WHERE id = ?
-		`, req.Winner, req.CompletedAt, matchID)
+		`, winningTeamID, req.CompletedAt, matchID)
 
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update match"})
@@ -235,17 +252,24 @@ func CompleteGame(db *sql.DB) gin.HandlerFunc {
 			}
 		}
 
-		// Update league standings if this is a league match
-		var leagueID *int
-		var team1ID, team2ID int
-		err = tx.QueryRow(`
-			SELECT league_id, team1_id, team2_id FROM matches WHERE id = ?
-		`, matchID).Scan(&leagueID, &team1ID, &team2ID)
-
-		if err == nil && leagueID != nil {
-			if standingsErr := UpdateLeagueStandings(tx, *leagueID, team1ID, team2ID, req.FinalScore.Team1, req.FinalScore.Team2); standingsErr != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update league standings"})
-				return
+		// Update league standings
+		if leagueID.Valid {
+			lid := int(leagueID.Int64)
+			if team1ID.Valid && team2ID.Valid {
+				// 2v2: standings by team
+				if standingsErr := UpdateLeagueStandings(tx, lid, int(team1ID.Int64), int(team2ID.Int64), req.FinalScore.Team1, req.FinalScore.Team2); standingsErr != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update league standings"})
+					return
+				}
+			} else {
+				// 1v1: standings by player — look up player IDs from the league game
+				_, t1Players, t2Players, _, lgErr := ParseLeagueGameFormat(tx, matchID)
+				if lgErr == nil && len(t1Players) > 0 && len(t2Players) > 0 {
+					if standingsErr := UpdatePlayerStandings(tx, lid, t1Players[0], t2Players[0], req.FinalScore.Team1, req.FinalScore.Team2); standingsErr != nil {
+						c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update league standings"})
+						return
+					}
+				}
 			}
 		}
 
